@@ -48,7 +48,7 @@ export function useJobDocumentSources(jobId: string | null | undefined, canSeeMo
     queryFn: async (): Promise<DocumentInvoice[]> => {
       const { data, error } = await supabase
         .from('fh_invoices')
-        .select('id, sequence_number, title, status, issued_at, due_at')
+        .select('id, sequence_number, title, status, issued_at, created_at, due_at')
         .eq('contact_id', jobId as string)
         .order('sequence_number', { ascending: true })
       if (error) throw error

@@ -15,9 +15,10 @@ import { useMembership } from '../../contexts/MembershipContext.tsx'
 import type { ContactInsert } from '../../lib/quotes.ts'
 import { createJob } from '../../lib/createJob.ts'
 import { createUuid } from '../../lib/uuid.ts'
-import { JOB_TYPES } from '../../lib/jobTypes.ts'
+import { JOB_TYPES, readLastJobType, writeLastJobType } from '../../lib/jobTypes.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Form = {
   requestId: string
@@ -41,7 +42,8 @@ export default function JobNew() {
   const clientParam = params.get('client')
   const text = params.get('text')
   const [requestId] = useState(createUuid)
-  const { form, set, patch, done } = useDraft<Form>('job', { ...EMPTY, requestId }, text ? { scope: text } : null)
+  const [lastJobType] = useState(readLastJobType)
+  const { form, set, patch, done } = useDraft<Form>('job', { ...EMPTY, requestId, jobType: lastJobType }, text ? { scope: text } : null)
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -99,13 +101,14 @@ export default function JobNew() {
       }
       const saved = await createJob(row)
       done()
+      writeLastJobType(form.jobType)
       void queryClient.invalidateQueries()
       hapticMedium()
       navigate(recordRoute('job', saved.id), { replace: true })
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      setErrors({ save: e instanceof Error && e.message ? e.message : 'Could not save this job. Check your connection and try again.' })
+      setErrors({ save: plainError(e, 'Could not save this job. Try again.', { kept: true, lead: true }) })
     }
   }
 

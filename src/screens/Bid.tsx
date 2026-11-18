@@ -28,6 +28,9 @@ import { updateProfilePreferences } from '../lib/profilePreferences.ts'
 import { changeTemplatePreferences, templatePreferences, type TemplatePreferences } from './estimates/estimateLibrary.ts'
 import QuoteLibrary from './estimates/QuoteLibrary.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
+import DraftRestored from '../components/DraftRestored.tsx'
+import { useEditDraft } from '../lib/useEditDraft.ts'
 
 
 // White-label: internal-only tool but no app-attributable phrasing
@@ -88,19 +91,24 @@ export default function Bid() {
       await updateProfilePreferences(user.id, current => changeTemplatePreferences(current, id, patch))
       await refreshProfile()
       toastSuccess('Library updated')
-    } catch (error) { toastError('Could not update library', error instanceof Error ? error.message : 'Try again.') }
+    } catch (error) { toastError('Could not update library', plainError(error, 'Try again.')) }
     finally { setTemplateSaving(null) }
   }
   // Deleting a template takes a second tap on the same button (D57).
   const deleteTap = useArmedId()
   const navigate = useNavigate()
-  const [scope, setScope] = useState('')
+  // The scope, job type and client being written stay on the device until
+  // the estimate becomes a quote, so a reload keeps them (D23).
+  const estimate = useEditDraft('estimate', { scope: '', jobType: '', clientName: '' }, { from: 'estimate' })
+  const { scope, jobType, clientName } = estimate.form
+  const setScope = (value: string) => estimate.set('scope', value)
+  const setJobType = (value: string) => estimate.set('jobType', value)
+  const setClientName = (value: string) => estimate.set('clientName', value)
   const [marginPct, setMarginPct] = useState(25)
   const [generating, setGenerating] = useState(false)
   const [bid, setBid] = useState<any>(null)
   const [err, setErr] = useState('')
   const [picks, setPicks] = useState<any[]>([])
-  const [jobType, setJobType] = useState('')
   const [copied, setCopied] = useState(false)
   const [pushing, setPushing] = useState(false)
   // The quote the bid becomes needs a client (SPEC D59): typed here, picked
@@ -108,7 +116,6 @@ export default function Bid() {
   const orgId = useOrgScope(user?.id)
   const { data: clientsBundle } = useClientsBundle(user?.id)
   const clients = clientsBundle?.clients ?? []
-  const [clientName, setClientName] = useState('')
   // Templates library (migration 024). Loaded via TanStack Query and
   // invalidated after every save/delete so the picker stays fresh.
   const templateQueryState = useEstimateTemplates(user?.id)
@@ -189,7 +196,7 @@ export default function Bid() {
       }
     } catch (e: any) {
       console.error('[bid] generate failed:', e)
-      setErr(e.message || 'Estimate generation failed')
+      setErr(plainError(e, 'The estimate could not be made. Try again.'))
     } finally {
       setGenerating(false)
     }
@@ -288,6 +295,7 @@ export default function Bid() {
       }
 
       hapticSuccess()
+      estimate.done()
       toastSuccess(
         'Pushed to a new quote',
         `${items.length} line item${items.length === 1 ? '' : 's'} added, ${money(recommendedPrice)}`
@@ -295,7 +303,7 @@ export default function Bid() {
       navigate(recordRoute('quote', quote.id))
     } catch (e: any) {
       console.error('[bid] pushToJob failed:', e)
-      toastError("Couldn't create the quote from this bid", e?.message || 'Try again.')
+      toastError("Couldn't create the quote from this bid", plainError(e, 'Try again.'))
     } finally {
       setPushing(false)
     }
@@ -327,7 +335,7 @@ export default function Bid() {
       setTemplateNamePrompt('')
       await fetchTemplates()
     } catch (e: any) {
-      toastError("Couldn't save template", e?.message || 'Try again.')
+      toastError("Couldn't save template", plainError(e, 'Try again.'))
     } finally {
       setSavingTemplate(false)
     }
@@ -362,7 +370,7 @@ export default function Bid() {
       toastSuccess('Template deleted', t.name)
       await fetchTemplates()
     } catch (e: any) {
-      toastError("Couldn't delete", e?.message || 'Try again.')
+      toastError("Couldn't delete", plainError(e, 'Try again.'))
     }
   }
 
@@ -646,6 +654,7 @@ export default function Bid() {
         <SectionHeader label="Scope" />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
+          {estimate.restored && <DraftRestored onDiscard={estimate.discard} />}
           {/* Scope textarea */}
           <textarea
             aria-label="Estimate scope"
@@ -794,7 +803,7 @@ export default function Bid() {
             }}>
               <div style={{ fontWeight: 700, color: 'var(--v3-danger-text)', marginBottom: 4 }}>AI unavailable</div>
               <div style={{ color: 'var(--v3-text-muted)', marginBottom: 10 }}>
-                {err}, your scope is preserved. Fill in line items manually if you need this estimate out the door.
+                {err}{/[.!?]$/.test(err) ? '' : '.'} Your scope is preserved. Fill in line items manually if you need this estimate out the door.
               </div>
               <button
                 type="button"

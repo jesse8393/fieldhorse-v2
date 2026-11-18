@@ -89,3 +89,38 @@ export function formatDate(value: string | Date | null | undefined, { long = fal
     year: 'numeric'
   })
 }
+
+/**
+ * A clock time as every screen prints it: "7:00 am", "8:15 pm", "12:30 am".
+ * Hour without a leading zero, two digit minutes, one plain space, am or
+ * pm in lower case, never left off, so an evening time never reads as
+ * morning (formats-12). Empty on a missing or broken value.
+ */
+export function timeOfDay(value: string | Date | null | undefined): string {
+  if (value == null || value === '') return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const hours = d.getHours()
+  return `${hours % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')} ${hours < 12 ? 'am' : 'pm'}`
+}
+
+/**
+ * A day and its time, "Nov 18, 7:00 am", with the time written the way
+ * timeOfDay writes it. `year` adds the year ("Nov 18, 2026, 7:00 am") and
+ * `weekday` the day name ("Wed, Nov 18, 7:00 am"). Empty on a missing or
+ * broken value.
+ */
+export function dateAndTime(
+  value: string | Date | null | undefined,
+  { year = false, weekday = false }: { year?: boolean; weekday?: boolean } = {}
+): string {
+  if (value == null || value === '') return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const day = d.toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric',
+    ...(year ? { year: 'numeric' as const } : {}),
+    ...(weekday ? { weekday: 'short' as const } : {})
+  })
+  return `${day}, ${timeOfDay(d)}`
+}

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 test('phone note actions fit, support keyboard archive and confirm both delete paths', async ({ context, page }, testInfo) => {
   test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone report actions')
@@ -63,7 +64,8 @@ test('phone note actions fit, support keyboard archive and confirm both delete p
   const archiveRow = history.getByRole('article').filter({ hasText: 'Keyboard archive' })
   await archiveRow.getByRole('button', { name: 'Archive note', exact: true }).press('Enter')
   await expect(archiveRow).toHaveCount(0)
-  expect(archived).toEqual([{ done: true }])
+  // The row leaves at once and the write follows it, so wait for the write.
+  await expect.poll(() => archived).toEqual([{ done: true }])
 })
 
 test('desktop customer directory reaches every record while preserving search and filter', async ({ context, page }, testInfo) => {
@@ -242,4 +244,51 @@ test('failed job lookup does not classify every report as an unavailable job', a
   await page.getByRole('button', { name: 'Retry job lookup', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'History job', exact: true })).toBeEnabled()
   await expect(history.locator('details')).toHaveCount(0)
+})
+
+// formats-3: Activity and Search name a record's amount to the cent, the
+// figure the invoice and the payment row show.
+test('Activity and Search keep the cents', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/activity', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('$1,000.50 received').first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$1,001 received')).toHaveCount(0)
+  await page.goto('/search', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByPlaceholder(/Jobs, clients/).fill('Harold')
+  await expect(page.getByText(/\$12,345\.50/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/\$4,115\.17/).first()).toBeVisible()
+  await expect(page.getByText(/\$12,346\b/)).toHaveCount(0)
+})
+
+// formats-9: a follow up date the AI read from a field report prints as a
+// date ("Nov 20, 2026"), never as raw "2026-11-20".
+test('a field report prints its follow up date as a date', async ({ context, page }) => {
+  const note = {
+    id: 'n-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', category: 'report', done: false,
+    text: 'Forms set on the driveway. Inspector wants to see the rebar before we pour, call him Friday.',
+    parsed: { summary: 'Forms set; rebar inspection needed before the pour.', action_items: ['Call the inspector'], risks: [], materials_needed: [], follow_up_date: '2026-11-20' },
+    created_at: '2026-11-17T14:00:00Z', when_text: null, action: null, audio_url: null, lead_id: null, quote_id: null
+  }
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_notes: [note] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/notes', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Forms set on the driveway/).first()).toBeVisible({ timeout: 30_000 })
+  const more = page.getByText('Read full report').filter({ visible: true }).first()
+  if (await more.count()) await more.click()
+  await expect(page.getByText(/Follow up:\s*Nov 20, 2026/).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText(/2026-11-20/).filter({ visible: true })).toHaveCount(0)
+})
+
+// Finding lost-work-11: a half written field report on the Notes screen
+// stays through a reload until it is saved.
+test('a half written report on the Notes screen survives a reload', async ({ context, page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await signIn(context)
+  await page.goto('/notes')
+  const box = page.locator('textarea').first()
+  await expect(box).toBeVisible({ timeout: 30_000 })
+  await box.fill(words)
+  await page.reload()
+  await expect(page.locator('textarea').first()).toHaveValue(words)
 })

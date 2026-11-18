@@ -13,3 +13,16 @@ test('the template choice offers only the four designs the database accepts', as
   await expect(picker).toBeAttached({ timeout: 20_000 })
   await expect(picker.locator('button')).toHaveText([/^Classic/, /^Slate/, /^Mint/, /^Editorial/])
 })
+
+// purple-2: each brand color preset is named for the color it paints. The
+// gray swatch was still called Indigo after the palette went gray. Saved
+// colors are hex values, so renaming the preset changes nothing stored.
+test('the gray brand color preset is named for its color', async ({ page, context }) => {
+  await signIn(context)
+  await page.goto('/settings?section=documents')
+  const gray = page.getByRole('button', { name: 'Use Slate', exact: true })
+  await gray.scrollIntoViewIfNeeded({ timeout: 20_000 })
+  await expect(gray).toHaveAttribute('title', 'Slate')
+  await expect(gray).toHaveCSS('background-color', 'rgb(92, 92, 92)')
+  await expect(page.getByRole('button', { name: 'Use Indigo' })).toHaveCount(0)
+})

@@ -1,11 +1,14 @@
 // The Today hero sentence (spec 9.2). Built in code from counts, never by
 // the model, so it always matches what the screen lists below it.
 //
-//   day:   "Three stops." / "First pour at 7:30."
+//   day:   "Three stops." / "First pour at 7:30 am."
 //   night: "Three stops done." / "Two things before tomorrow."
 //
-// Times are local, on a 12 hour clock without am or pm, as people say
-// them on site. Counts are words up to ten and numerals after.
+// Times are local, on a 12 hour clock, with am or pm the way every other
+// screen writes a time (formats-12). Counts are words up to ten and
+// numerals after.
+
+import { timeOfDay } from './dates.ts'
 
 export type HeadlineStop = { startAt: string; title: string | null }
 export type Headline = { title: [string, string] }
@@ -43,7 +46,8 @@ export function dayHeadline(stops: HeadlineStop[]): Headline {
   }
   const lead = `${counted(stops.length, 'stop', 'stops')}.`
   if (!first) return { title: [lead, 'No start times yet.'] }
-  const time = clockTime(new Date(first.at))
+  // Always with am or pm, the way every other screen writes a time (formats-12).
+  const time = timeOfDay(new Date(first.at))
   return { title: [lead, isPour(first.title) ? `First pour at ${time}.` : `First at ${time}.`] }
 }
 

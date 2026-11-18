@@ -28,6 +28,7 @@ import { orgMembersList, type OrgMember } from '../lib/orgApi.ts'
 import { toastError, toastSuccess, toastUndo } from '../lib/toast.ts'
 import { Button } from '../ui/index.ts'
 import './tasks.css'
+import { plainError } from '../lib/serviceErrors.ts'
 
 type TaskRow = {
   id: string
@@ -147,7 +148,7 @@ export default function Tasks() {
       setJobNames(jobNames)
       setAllJobs(activeJobs.map(job => ({ id: job.id, name: job.job_title || job.name || 'Untitled job' })))
     } catch (error: any) {
-      if (revision === loadRevision.current) setError(error?.message || 'Could not load tasks.')
+      if (revision === loadRevision.current) setError(plainError(error, 'Could not load tasks.'))
     } finally {
       if (revision === loadRevision.current) setLoading(false)
     }
@@ -191,7 +192,7 @@ export default function Tasks() {
       .eq('id', rowId)
       .select('id')
     if (error || !data?.length) {
-      toastError("Couldn't complete", error?.message || 'This task could not be updated. Refresh and try again.')
+      toastError("Couldn't complete", plainError(error, 'This task could not be updated. Refresh and try again.'))
       void load()
       return
     }
@@ -201,7 +202,7 @@ export default function Tasks() {
         const { data: restored, error: restoreError } = await supabase.from('fh_job_todos')
           .update({ done: snapshot.done, completed_at: snapshot.completed_at }).eq('id', rowId).select('id')
         if (restoreError || !restored?.length) {
-          toastError("Couldn't undo", restoreError?.message || 'This task could not be restored. Refresh and try again.')
+          toastError("Couldn't undo", plainError(restoreError, 'This task could not be restored. Refresh and try again.'))
           return
         }
         await load()
@@ -213,7 +214,7 @@ export default function Tasks() {
   async function reassignTask(rowId: string, assignee: string | null) {
     setTasks((cur) => cur.map((t) => t.id === rowId ? { ...t, assigned_to: assignee } : t))
     const { data, error } = await supabase.from('fh_job_todos').update({ assigned_to: assignee }).eq('id', rowId).select('id')
-    if (error || !data?.length) { toastError("Couldn't reassign", error?.message || 'This task could not be updated. Refresh and try again.'); void load() }
+    if (error || !data?.length) { toastError("Couldn't reassign", plainError(error, 'This task could not be updated. Refresh and try again.')); void load() }
   }
 
   // Delete a task with Undo.
@@ -222,14 +223,14 @@ export default function Tasks() {
     setTasks((cur) => cur.filter((t) => t.id !== rowId))
     headingRef.current?.focus({ preventScroll: true })
     const { data, error } = await supabase.from('fh_job_todos').delete().eq('id', rowId).select('*')
-    if (error || !data?.length) { toastError("Couldn't delete", error?.message || 'This task could not be deleted. Refresh and try again.'); void load(); return }
+    if (error || !data?.length) { toastError("Couldn't delete", plainError(error, 'This task could not be deleted. Refresh and try again.')); void load(); return }
     const snapshot = data[0]
     toastUndo('Task deleted', {
       description: snapshot?.text || 'Tap Undo to restore',
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_job_todos').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         load()
       }
     })
@@ -245,7 +246,7 @@ export default function Tasks() {
       assigned_to: input.assignedTo,
       due_at: input.dueAt
     })
-    if (error) { toastError("Couldn't add task", error.message); return false }
+    if (error) { toastError("Couldn't add task", plainError(error, 'Try again.')); return false }
     toastSuccess('Task added', input.text.trim())
     load()
     return true
@@ -272,7 +273,7 @@ export default function Tasks() {
             </div>
           </section>
           <div className="fh-build-table__empty">
-            Your role ({role || 'unknown'}) can't see every task. Open <button type="button" className="fh-build-inline-link" onClick={() => navigate('/crew')}>your crew home</button> instead, that's your own task list.
+            Your role ({role || 'unknown'}) can't see every task. Open <button type="button" className="fh-build-inline-link" onClick={() => navigate('/crew')}>your crew home</button> instead. That's your own task list.
           </div>
         </div>
       </div>

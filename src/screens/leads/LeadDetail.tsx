@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarPlus, ChevronLeft, FileText, MessageSquare, Navigation, Phone } from 'lucide-react'
 import { Button, Chip, Field, IconButton, SkeletonRows, SyncPill } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
+import DraftRestored from '../../components/DraftRestored.tsx'
 import { useAuth } from '../../contexts/AuthContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { useLead, useInvalidateLeads, leadKey, type LeadRow } from '../../lib/queries.ts'
@@ -30,10 +31,13 @@ import { leadName, leadNeed, scheduleEstimateRoute, visitDay, visitTime } from '
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
 import { resilientUpdate } from '../../lib/outbox.ts'
+import { clearDraft, startEdit, writeDraft } from '../../lib/drafts.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
 import { formatPhone } from '../../lib/utils.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { toastError } from '../../lib/toast.ts'
 import './leads.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Visit = { id: string; title: string | null; start_at: string | null; end_at: string | null }
 type Note = { id: string; text: string | null; created_at: string | null; category: string | null }
@@ -91,6 +95,10 @@ export type LeadDetailProps = {
   fallback: ReactNode
 }
 
+function notesDraftKind(leadId: string) {
+  return `edit:lead-notes:${leadId}`
+}
+
 export default function LeadDetail({ id, fallback }: LeadDetailProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -118,13 +126,18 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
   })
 
   // Notes: the field owns its text while the person types; the row's
-  // value seeds it once per lead and after each save.
+  // value seeds it once per lead and after each save. Notes not saved yet
+  // are kept on the device until the server has them (D23), so a save the
+  // server refused is not lost: they come back here and are tried again.
   const [notes, setNotes] = useState('')
   const [notesSeeded, setNotesSeeded] = useState<string | null>(null)
+  const [notesRestored, setNotesRestored] = useState(false)
   const savedNotes = useRef<string | null>(null)
   if (lead && notesSeeded !== lead.id) {
+    const kept = startEdit(notesDraftKind(lead.id), { notes: lead.notes ?? '' })
     setNotesSeeded(lead.id)
-    setNotes(lead.notes ?? '')
+    setNotes(kept ? kept.form.notes : lead.notes ?? '')
+    setNotesRestored(!!kept)
     savedNotes.current = lead.notes ?? ''
   }
 
@@ -140,6 +153,7 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
     const next = text.trim()
     const before = (savedNotes.current ?? '').trim()
     if (next === before) return
+    writeDraft(notesDraftKind(target), { notes: text }, { notes: savedNotes.current ?? '' })
     savedNotes.current = next
     const res = await resilientUpdate('fh_leads', { id: target }, { notes: next || null }, { userId: user?.id })
     if (res.error) {
@@ -147,11 +161,18 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
       toastError('Could not save the notes.', 'Check your connection and try again.')
       return
     }
+    if (latest.current.notes.trim() === next) clearDraft(notesDraftKind(target))
+    if (latest.current.leadId === target) setNotesRestored(false)
     queryClient.setQueryData<LeadRow | null>(leadKey(target), (prev) => (prev ? { ...prev, notes: next || null } : prev))
     invalidateLeads()
   }
   const saveNotesRef = useRef(saveNotes)
   saveNotesRef.current = saveNotes
+  function discardNotes() {
+    if (lead) clearDraft(notesDraftKind(lead.id))
+    setNotes(savedNotes.current ?? '')
+    setNotesRestored(false)
+  }
 
   // After a pause in typing.
   useEffect(() => {
@@ -224,20 +245,28 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
       void queryClient.invalidateQueries({ queryKey: homeDashboardKey(user?.id).slice(0, 2) })
       return true
     } catch (e) {
-      toastError(e instanceof Error ? e.message : 'Could not save the lead.', 'Check your connection and try again.')
+      toastError(plainError(e, 'Could not save the lead.'), 'Check your connection and try again.')
       return false
     } finally {
       setBusy(false)
     }
   }
 
-  const [editing, setEditing] = useState(false)
-  const [details, setDetails] = useState({ title: '', job_type: '', source: '' })
+  // What they need, the job type and the source being edited stay on the
+  // device until saved or cancelled, so a reload opens the edit again (D23).
+  const detailsDraft = useEditDraft(lead ? `edit:lead-details:${lead.id}` : null, { title: lead?.title ?? '', job_type: lead?.job_type ?? '', source: lead?.source ?? '' })
+  const details = detailsDraft.form
+  const setDetails = detailsDraft.update
+  const [editingOpen, setEditing] = useState(false)
+  const editing = editingOpen || detailsDraft.dirty
   function startEditing() {
     if (!lead) return
     hapticTap()
-    setDetails({ title: lead.title ?? '', job_type: lead.job_type ?? '', source: lead.source ?? '' })
     setEditing(true)
+  }
+  function cancelEditing() {
+    detailsDraft.discard()
+    setEditing(false)
   }
   async function saveDetails() {
     const ok = await patchLead({
@@ -245,7 +274,10 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
       job_type: details.job_type || null,
       source: details.source || null
     })
-    if (ok) setEditing(false)
+    if (ok) {
+      detailsDraft.done()
+      setEditing(false)
+    }
   }
 
   const client = lead?.fh_clients ?? null
@@ -362,12 +394,13 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
           <h2 className="fhl-section__title" id="fhl-need-title">What they need</h2>
           {editing ? (
             <div className="fhl-edit">
+              {detailsDraft.restored && <DraftRestored onDiscard={cancelEditing} />}
               <Field label="What they need" value={details.title} onChange={(e) => setDetails((d) => ({ ...d, title: e.target.value }))} />
               <Choices label="Job type" options={JOB_TYPES} value={details.job_type} onChange={(v) => setDetails((d) => ({ ...d, job_type: v }))} />
               <Choices label="Source" options={LEAD_SOURCES} value={details.source} onChange={(v) => setDetails((d) => ({ ...d, source: v }))} />
               <div className="fhl-line__actions">
                 <Button variant="primary" size="md" loading={busy} onClick={() => { void saveDetails() }}>Save details</Button>
-                <Button variant="quiet" size="md" onClick={() => setEditing(false)}>Cancel</Button>
+                <Button variant="quiet" size="md" onClick={cancelEditing}>Cancel</Button>
               </div>
             </div>
           ) : (
@@ -443,6 +476,7 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
         )}
 
         <section className="fhl-section">
+          {notesRestored && <DraftRestored onDiscard={discardNotes} />}
           <Field
             multiline
             label="Notes"

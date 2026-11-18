@@ -49,3 +49,42 @@ test('inviting a partner explains financial access before the send action', asyn
   await expect(page.getByText(/use the same sharing permissions/)).toBeVisible()
   await expect(page.getByText(/not your client info or pricing/)).toHaveCount(0)
 })
+
+// dead-ends-2: a signed in person with no company role (a sub on another
+// contractor's job, or a teammate the owner removed) can open only the sub
+// portal. Every control it shows leads somewhere they can open, the job
+// they were invited to is listed without a link that bounces, and they can
+// sign out.
+test('with no company role the sub portal shows only controls that work, and Sign out', async ({ context, page }) => {
+  await signIn(context, { tables: { org_members: [], organizations: [] } })
+  await context.route('**/api/sub-portal-context', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      ok: true,
+      matched_profiles: [],
+      accepted_partners: [{ id: 'jp-1', job_id: 'c-job1', partner_role: 'Concrete finisher', accepted_at: '2026-11-10T15:00:00Z', partner_email: 'qa@fieldhorse.local' }],
+      linked_jobs: { 'c-job1': { id: 'c-job1', name: 'Plumbing Bellevue', address: '412 Burkitt Station Rd', stage: 'job' } }
+    })
+  }))
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/sub-portal$/, { timeout: 30_000 })
+  const portal = page.locator('[data-build-screen="SubPortal"]')
+  await expect(portal.getByText('Plumbing Bellevue')).toBeVisible({ timeout: 30_000 })
+
+  // The job belongs to the contractor, so its row is not a button that
+  // bounces back here.
+  await expect(page.getByRole('button', { name: /Plumbing Bellevue/ })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: /Plumbing Bellevue/ })).toHaveCount(0)
+  // No header or page control that only lands back on the sub portal.
+  for (const name of ['New', 'More']) await expect(page.getByRole('link', { name, exact: true })).toHaveCount(0)
+  for (const name of ['Search everything', 'Open workspace menu', 'Open command palette', 'Open activity', 'Notifications']) {
+    await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+  }
+  await expect(page.getByRole('button', { name: /^Capture/ })).toHaveCount(0)
+
+  const signOut = page.getByRole('button', { name: 'Sign out', exact: true })
+  await expect(signOut).toBeVisible()
+  await signOut.click()
+  await expect(page).toHaveURL(/\/login/, { timeout: 30_000 })
+})

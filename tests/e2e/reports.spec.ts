@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -46,6 +47,25 @@ async function open(page: Page) {
   await expect(page.locator('.fh-app')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible({ timeout: 30_000 })
 }
+
+// A brand new company has nothing to report. Both layouts say what fills
+// the page and offer the first step, instead of a dashboard of $0 with a
+// largest and a smallest stage that are the same empty stage.
+test('Reports on a company with no work yet offers the first lead', async ({ context, page }) => {
+  await signIn(context, { tables: {
+    fh_contacts: [], fh_leads: [], fh_quotes: [], fh_invoices: [], fh_payments: [],
+    fh_stage_transitions: [], fh_change_orders: [], fh_clients: []
+  } })
+  await open(page)
+  const main = page.locator('#fh-main')
+  await expect(main.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toBeVisible()
+  await main.getByRole('link', { name: 'New lead', exact: true }).click()
+  await expect(page).toHaveURL(/\/leads\/new$/)
+  await page.goBack()
+  await expect(main.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toBeVisible()
+  await expect(main.getByText('Smallest stage')).toHaveCount(0)
+  await expect(main).not.toContainText('$0')
+})
 
 test.describe('Reports read the four records', () => {
   test('the funnel counts leads, quotes, a quote that became a job and the lost ones', async ({ context, page }, testInfo) => {
@@ -110,7 +130,7 @@ test.describe('Reports read the four records', () => {
     await open(page)
     const chart = page.locator('.fh-build-chart-card').filter({ hasText: 'Revenue received' })
     await expect(chart).toContainText('September 2026 versus August 2026')
-    await expect(chart).toContainText('$47,000 less')
+    await expect(chart).toContainText('$47,000.00 less')
     await expect(chart).toContainText('Oct · so far')
     await expect(page.getByText('collection rate YTD', { exact: true })).toHaveCount(0)
   })
@@ -153,7 +173,8 @@ test('the margin counts an approved change order', async ({ context, page }, tes
   const value = testInfo.project.name.startsWith('desktop')
     ? page.getByRole('heading', { name: 'Tracked margin', exact: true }).locator('..').locator('strong')
     : page.locator('.fh-report-metric').filter({ hasText: 'Avg margin' }).locator('.fh-report-metric__value')
-  await expect(value).toHaveText('20%')
+  // formats-4: one decimal, the way Money prints Tracked margin.
+  await expect(value).toHaveText('20.0%')
 })
 
 // D05: a payment on an invoice that bills a client directly (no job)
@@ -187,4 +208,63 @@ test('log miles shows and computes the IRS rate for the drive date', async ({ co
   await page.getByLabel('Date', { exact: true }).fill('2026-03-02')
   await expect(page.getByText(/on this date is \$0\.725 deducted/)).toBeVisible()
   await expect(page.getByText('Deduction $72.50', { exact: true })).toBeVisible()
+  // formats-7: a deduction over a thousand dollars keeps its comma.
+  await page.getByLabel('Miles', { exact: true }).fill('2000')
+  await expect(page.getByText('Deduction $1,450.00', { exact: true })).toBeVisible()
 })
+
+// formats-4: a client's payments in Top clients read to the cent, the
+// figure the payment shows, never rounded to whole dollars.
+test('top clients names a client\'s payments to the cent', async ({ context, page }, testInfo) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page)
+  const list = testInfo.project.name.startsWith('desktop')
+    ? page.locator('.fh-build-table').filter({ hasText: 'Top clients' })
+    : page.getByText('Top clients · 90 days', { exact: true }).locator('..')
+  await expect(list.getByText('Harold Wickham', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(list.getByText('$1,000.50', { exact: true })).toBeVisible()
+  await expect(list.getByText('$1,001', { exact: true })).toHaveCount(0)
+})
+
+// formats-4: with cents on every figure, seven figure stage and monthly
+// totals still fit. The drawn text of each figure sits
+// inside its own row or column, so no cents are clipped and no two month
+// figures run into each other.
+for (const width of [1024, 1280]) {
+  test(`stage and month figures with cents fit at ${width} px`, async ({ context, page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('desktop'), 'The desktop report')
+    await page.setViewportSize({ width, height: 900 })
+    await page.clock.setFixedTime(new Date('2026-10-27T15:00:00Z'))
+    const months = ['2026-05-15', '2026-06-15', '2026-07-15', '2026-08-15', '2026-09-15', '2026-10-15']
+    await signIn(context, { tables: {
+      fh_contacts: [{ id: 'c-big', user_id: USER.id, stage: 'job', name: 'Big client', amount: 1234567.89, cost: null, updated_at: iso(NOW), created_at: iso(NOW) }],
+      fh_payments: months.map((paid_on, i) => ({ id: `p-${i}`, user_id: USER.id, contact_id: 'c-big', amount: 1234567.89 + i, paid_on })),
+      fh_stage_transitions: [], fh_invoices: []
+    } })
+    await open(page)
+    const bar = page.locator('.fh-build-stage-bar').filter({ hasText: '$1,234,567.89' })
+    await expect(bar).toHaveCount(1, { timeout: 30_000 })
+    const fits = await bar.evaluate((row) => {
+      const value = row.querySelector('.fh-build-stage-bar__value') as HTMLElement
+      const range = document.createRange()
+      range.selectNodeContents(value)
+      const text = range.getBoundingClientRect()
+      const box = row.getBoundingClientRect()
+      const card = (row.closest('.fh-build-chart-card') as HTMLElement).getBoundingClientRect()
+      return text.left >= box.left - 0.5 && text.right <= Math.min(box.right, card.right) + 0.5
+    })
+    expect(fits, 'the stage value is drawn whole inside its row').toBe(true)
+    const columns = page.locator('.fh-build-trend-col')
+    await expect(columns).toHaveCount(6)
+    const spill = await columns.evaluateAll((cols) => cols.map((col) => {
+      const value = col.querySelector('.fh-build-trend-col__value') as HTMLElement
+      const range = document.createRange()
+      range.selectNodeContents(value)
+      const text = range.getBoundingClientRect()
+      const box = col.getBoundingClientRect()
+      return text.left >= box.left - 0.5 && text.right <= box.right + 0.5 ? null : value.textContent
+    }).filter(Boolean))
+    expect(spill, 'each month figure stays inside its own column').toEqual([])
+  })
+}

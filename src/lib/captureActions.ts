@@ -13,8 +13,11 @@ import { createLead } from './leads.ts'
 import { lastKnownOrg } from './orgScope.ts'
 import { logPayment, recalcCost } from './stages.ts'
 import type { CaptureIntent } from './captureIntelligence.ts'
+import { moneyCents } from './format.ts'
 
-const formatMoney = (n: number) => '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+// Saved into the lead's notes, so it is written the way the app prints
+// money: "$1,000.50", never "$1,000.5" (formats-7).
+const formatMoney = (n: number) => moneyCents(n)
 
 // The slice of fh_contacts the capture flow loads for matching +
 // payment logging. logPayment() needs user_id/amount/stage off the row.
@@ -34,10 +37,12 @@ export type CommitResult = {
   toast: string
 }
 
-export async function commitCapture({ intent, userId, contacts }: {
+export async function commitCapture({ intent, userId, contacts, paymentId }: {
   intent: CaptureIntent
   userId: string
   contacts: CaptureContact[]
+  /** The payment's id, kept by the screen for every Save of one capture, so a retry is the same payment. */
+  paymentId?: string
 }): Promise<CommitResult> {
   const job = intent.job_id ? contacts.find((c) => c.id === intent.job_id) || null : null
 
@@ -52,7 +57,7 @@ export async function commitCapture({ intent, userId, contacts }: {
       if (error) throw error
       return {
         link: job ? `/jobs/${job.id}` : '/notes',
-        toast: queued ? 'Note saved, will sync when back online' : 'Note saved'
+        toast: queued ? 'Note saved. It will sync when you are back online.' : 'Note saved'
       }
     }
 
@@ -80,13 +85,14 @@ export async function commitCapture({ intent, userId, contacts }: {
         due_at: intent.due_at ? new Date(`${intent.due_at}T12:00:00`).toISOString() : null
       })
       if (error) throw error
-      return { link: `/jobs/${job.id}`, toast: queued ? 'Task saved, will sync' : 'Task added' }
+      return { link: `/jobs/${job.id}`, toast: queued ? 'Task saved. It will sync when you are back online.' : 'Task added' }
     }
 
     case 'payment': {
       if (!job) throw new Error('Pick a job to log the payment against.')
       if (!intent.amount) throw new Error('Enter the payment amount.')
       const { error } = await logPayment(job as any, {
+        id: paymentId,
         amount: intent.amount,
         method: intent.method,
         kind: intent.payment_kind
@@ -122,7 +128,7 @@ export async function commitCapture({ intent, userId, contacts }: {
         end_at: intent.end_at
       })
       if (error) throw error
-      return { link: '/schedule', toast: queued ? 'Saved, will sync' : 'Added to schedule' }
+      return { link: '/schedule', toast: queued ? 'Saved. It will sync when you are back online.' : 'Added to schedule' }
     }
 
     case 'lead': {

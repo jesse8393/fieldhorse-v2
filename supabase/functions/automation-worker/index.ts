@@ -353,12 +353,15 @@ async function runAgent(db: any, row: Outbox) {
     else if (t.name === "create_task") proposal.actions.push({ type: "create_task", text: t.input.text });
   }
   const usage = body.usage ?? {};
+  // The owner's alerts open this client's conversation (dead-ends-7); a run
+  // with none keeps the client link, which the Inbox opens the same way.
+  const inboxLink = ar.conversation_id ? `/inbox/${encodeURIComponent(ar.conversation_id)}` : `/inbox?client=${ar.client_id}`;
   const base = { output: { text: textOut, tool_uses: toolUses.map((t) => ({ name: t.name, input: t.input })), model: body.model }, proposal, tokens_in: usage.input_tokens ?? null, tokens_out: usage.output_tokens ?? null, updated_at: new Date().toISOString() };
 
   // side actions that never need approval: tasks for the owner
   for (const a of proposal.actions) {
     if (a.type === "create_task") {
-      await rpc(db, "fh_notify_org", { p_org_id: row.org_id, p_kind: "task", p_title: a.text, p_body: `From ${agent.name}`, p_link: `/inbox?client=${ar.client_id}`, p_to: "owners", p_user_ids: null }).catch(() => {});
+      await rpc(db, "fh_notify_org", { p_org_id: row.org_id, p_kind: "task", p_title: a.text, p_body: `From ${agent.name}`, p_link: inboxLink, p_to: "owners", p_user_ids: null }).catch(() => {});
     }
   }
 
@@ -368,7 +371,7 @@ async function runAgent(db: any, row: Outbox) {
   }
   if (proposal.escalate && !proposal.body) {
     await saveAgentRun(db, ar, { ...base, status: "proposed" });
-    await rpc(db, "fh_notify_org", { p_org_id: row.org_id, p_kind: "escalation", p_title: `${agent.name}: needs you`, p_body: proposal.escalate, p_link: `/inbox?client=${ar.client_id}`, p_to: "owners", p_user_ids: null }).catch(() => {});
+    await rpc(db, "fh_notify_org", { p_org_id: row.org_id, p_kind: "escalation", p_title: `${agent.name}: needs you`, p_body: proposal.escalate, p_link: inboxLink, p_to: "owners", p_user_ids: null }).catch(() => {});
     await rpc(db, "fh_tag_add", { p_org_id: row.org_id, p_client_id: ar.client_id, p_tag: "needs_owner", p_source: "agent", p_user: null }).catch(() => {});
     return { result: { status: "escalated" } };
   }
@@ -395,6 +398,6 @@ async function runAgent(db: any, row: Outbox) {
     await saveAgentRun(db, ar, { status: "auto_executed", updated_at: new Date().toISOString() });
     return { result: { status: "auto_executed", message_id: msgId } };
   }
-  await rpc(db, "fh_notify_org", { p_org_id: row.org_id, p_kind: "ai_draft", p_title: `${agent.name} drafted a reply for ${ctx?.client?.name ?? "a client"}`, p_body: (proposal.body ?? "").slice(0, 140), p_link: `/inbox?client=${ar.client_id}`, p_to: "owners", p_user_ids: null }).catch(() => {});
+  await rpc(db, "fh_notify_org", { p_org_id: row.org_id, p_kind: "ai_draft", p_title: `${agent.name} drafted a reply for ${ctx?.client?.name ?? "a client"}`, p_body: (proposal.body ?? "").slice(0, 140), p_link: inboxLink, p_to: "owners", p_user_ids: null }).catch(() => {});
   return { result: { status: "proposed", reason: autoBlock } };
 }

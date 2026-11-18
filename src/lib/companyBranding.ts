@@ -17,6 +17,7 @@ import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { useProfile } from '../contexts/ProfileContext.tsx'
+import { companyFromProfile } from './invoices.ts'
 
 /** The fields of a profile a document's company block is built from. */
 export type CompanyBranding = {
@@ -51,9 +52,7 @@ function functionMissing(error: { code?: string; message?: string }) {
  * the read fails.
  */
 export async function fetchCompanyBranding(orgId: string): Promise<CompanyBranding | null> {
-  // The generated types do not list the function until its migration is applied.
-  const rpc = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>
-  const { data, error } = await rpc(FUNCTION, { p_org_id: orgId })
+  const { data, error } = await supabase.rpc(FUNCTION, { p_org_id: orgId })
   if (error) {
     if (functionMissing(error)) return null
     throw Object.assign(new Error(error.message || "Couldn't read the company details."), { code: error.code })
@@ -92,4 +91,14 @@ export function useDocumentProfile(orgId: string | null | undefined) {
     return documentProfile(branding, own)
   }, [orgId, own, queryClient])
   return { profile, load }
+}
+
+/**
+ * The company name a record of company `orgId` is printed under, the name
+ * its invoice numbers are built from (PCC-2D3E-01), so a screen names an
+ * invoice the way its PDF and customer link do (formats-1).
+ */
+export function useDocumentCompanyName(orgId: string | null | undefined): string {
+  const { profile } = useDocumentProfile(orgId)
+  return companyFromProfile(profile).name
 }

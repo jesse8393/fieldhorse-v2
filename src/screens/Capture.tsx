@@ -57,6 +57,8 @@ import { toastSuccess, toastError, toastInfo } from '../lib/toast.ts'
 import { ACTIVE_STAGES } from '../lib/stages.ts'
 import { useNavAccess } from '../lib/useNavAccess.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
+import { useEditDraft } from '../lib/useEditDraft.ts'
+import DraftRestored from '../components/DraftRestored.tsx'
 import {
   routeCapture, normalizeIntent, CAPTURE_KIND_META,
   EXPENSE_CATEGORIES, PAYMENT_KINDS,
@@ -67,7 +69,10 @@ import { commitCapture, refreshAfterCapture, type CaptureContact } from '../lib/
 import { pushOutbox } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
 import { speechErrorFeedback } from '../lib/speech.ts'
+import { createUuid } from '../lib/uuid.ts'
 import './capture.css'
+import { plainError } from '../lib/serviceErrors.ts'
+import { timeOfDay } from '../lib/dates.ts'
 
 type Phase = 'input' | 'parsing' | 'confirm' | 'saving'
 // Where the words came from, for the "Heard" line.
@@ -101,14 +106,20 @@ export default function Capture() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [phase, setPhase] = useState<Phase>('input')
-  const [text, setText] = useState('')
   const [intent, setIntent] = useState<CaptureIntent | null>(null)
   const [accessNotice, setAccessNotice] = useState('')
   const [contacts, setContacts] = useState<CaptureContact[]>([])
   // The job the screen was opened on (?job=, from openCapture({ jobId })),
   // and its row once loaded. Work past the roster's 100 most recent rows,
-  // and closed or lost work, is not in `contacts`, so the row is fetched by id.
+  // and closed or lost work, is not in `contacts`, so the row is fetched by
+  // id.
   const attachedJobId = params.get('job') || null
+  // The words are kept on the device until they are filed or discarded, so
+  // a reload or the phone's Back, which skips the second tap below, never
+  // loses them (D23).
+  const words = useEditDraft(`capture:${attachedJobId || 'any'}`, { text: '' }, { from: 'capture' })
+  const text = words.form.text
+  const setText = (value: string) => words.set('text', value)
   const [attachedJob, setAttachedJob] = useState<CaptureContact | null>(null)
   const [listening, setListening] = useState(false)
   const [source, setSource] = useState<Source>('text')
@@ -124,6 +135,11 @@ export default function Capture() {
   // Bumped on every reset, so a parse that returns after the screen was
   // left or started over does not bring its card back.
   const runRef = useRef(0)
+  // The payment's id, made once per confirmed capture and kept for every
+  // Save of it, as the payment screens keep theirs (DATA-15). A Save whose
+  // answer was lost is tried again with the same id, so the upsert finds
+  // the first row instead of recording the payment twice.
+  const paymentIdRef = useRef(createUuid())
   const ids = useId()
   const titleRef = useRef<HTMLHeadingElement>(null)
   // Back with words not saved yet asks with a second tap (D57).
@@ -215,6 +231,8 @@ export default function Capture() {
     hapticTap()
     runRef.current += 1
     stopVoice()
+    // Filed, queued, or discarded with the second tap: nothing to keep.
+    words.done()
     const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
     if (idx > 0) navigate(-1)
     else navigate('/', { replace: true })
@@ -242,6 +260,7 @@ export default function Capture() {
       setAccessNotice('')
     }
     setIntent(next)
+    paymentIdRef.current = createUuid()
     setAmountDraft(null)
     setEditing((next.kind === 'payment' || next.kind === 'expense') && !next.amount)
     setChoosingJob(next.kind === 'payment' && !next.job_id)
@@ -320,7 +339,7 @@ export default function Capture() {
     } catch (e: any) {
       if (run !== runRef.current) return
       hapticError()
-      toastError("Couldn't read the receipt", e?.message || 'Add it by voice or text instead.')
+      toastError("Couldn't read the receipt", plainError(e, 'Add it by voice or text instead.'))
       setSource('text')
       setPhase('input')
     } finally {
@@ -383,7 +402,7 @@ export default function Capture() {
     }
     setPhase('saving')
     try {
-      const result = await commitCapture({ intent: it, userId: user.id, contacts: roster })
+      const result = await commitCapture({ intent: it, userId: user.id, contacts: roster, paymentId: paymentIdRef.current })
       void refreshAfterCapture(queryClient, user.id, it.job_id ?? null)
       hapticSuccess()
       toastSuccess(result.toast, it.summary)
@@ -393,7 +412,7 @@ export default function Capture() {
       void result.link
     } catch (e: any) {
       hapticError()
-      toastError("Couldn't save that", e?.message || 'Try again.')
+      toastError("Couldn't save that", plainError(e, 'Try again.'))
       setPhase('confirm')
     }
   }
@@ -471,6 +490,7 @@ export default function Capture() {
               {listening && <span className="fh-capture__time">{clock(elapsedMs)}</span>}
             </div>
 
+            {words.restored && <DraftRestored onDiscard={words.discard} />}
             <Field
               multiline
               label="Or type it"
@@ -912,7 +932,7 @@ function dayLabel(d: Date, now: Date) {
 
 // 8:00 am
 function timeLabel(d: Date) {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase()
+  return timeOfDay(d)
 }
 
 // ISO (UTC) → value for <input type="datetime-local"> in local time.

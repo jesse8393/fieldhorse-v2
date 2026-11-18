@@ -8,6 +8,7 @@ import RateCardEditor from '../components/settings/RateCardEditor.tsx'
 import '../styles/settings.css'
 const SnowSettingsBuild = lazy(() => import('../components/desktop/SnowSettingsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { isEnterToSave, useKeyboardInset } from '../lib/useKeyboardOpen.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
@@ -18,6 +19,7 @@ import { pushSupport, pushEnabled, enablePush, disablePush } from '../lib/push.t
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { countNoun } from '../lib/format.ts'
+import { removeDemoData } from '../lib/demoSeed.ts'
 import { Switch } from '@/components/ui/switch'
 import { Eyebrow } from '../components/v3'
 import {
@@ -27,25 +29,11 @@ import {
 
 import { preferenceObject, updateProfilePreferences } from '../lib/profilePreferences.ts'
 import { activeSettingsSection, SETTINGS_SECTIONS, SETTINGS_SECTION_FIELDS, settingsSectionDirty, settingsSectionFor, settingsSectionPatch, type SettingsSection } from '../lib/settingsSections.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const SettingsSectionContext = createContext<SettingsSection>('business')
 
 const SERVICES = ['Concrete', 'Framing', 'Roofing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Paint', 'Tile', 'Landscaping', 'Excavation', 'Insulation']
-
-// Child tables the demo seed writes keyed by contact_id, deleted first
-// (scoped to the demo contact ids) before the contacts, in case a child FK
-// isn't ON DELETE CASCADE. Mirrors what seedDemoData() inserts.
-// Each child table plus the column that foreign-keys back to the demo
-// contact. Most use `contact_id`; fh_job_todos keys on `job_id` (its FK
-// column name, see migration 006). Using the wrong column silently
-// deletes nothing and, since we only read { count }, swallows the
-// "column does not exist" error.
-const DEMO_CHILD_TABLES: { table: string; fk: string }[] = [
-  { table: 'fh_expenses',  fk: 'contact_id' },
-  { table: 'fh_schedule',  fk: 'contact_id' },
-  { table: 'fh_notes',     fk: 'contact_id' },
-  { table: 'fh_job_todos', fk: 'job_id' }
-]
 
 function canonicalServices(services: unknown): string[] {
   const canonical = new Set(SERVICES)
@@ -157,51 +145,13 @@ export default function Settings() {
     setWiping(true)
     setWipeResult('')
     try {
-      // Resolve the demo contacts, delete their children explicitly (in case
-      // a child FK isn't ON DELETE CASCADE), then the contacts, then the
-      // demo clients. Everything is scoped to source='demo' + this user.
-      const { data: demoContacts, error: dcErr } = await supabase
-        .from('fh_contacts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('source' as any, 'demo')
-      if (dcErr) throw new Error(dcErr.message)
-      const ids = (demoContacts || []).map((c: any) => c.id)
-
-      let total = 0
-      if (ids.length) {
-        for (const { table, fk } of DEMO_CHILD_TABLES) {
-          const { error: childErr, count } = await supabase
-            .from(table as any)
-            .delete({ count: 'exact' })
-            .eq('user_id', user.id)
-            .in(fk, ids)
-          // Surface a real failure instead of quietly under-counting.
-          if (childErr) throw new Error(`${table}: ${childErr.message}`)
-          total += count ?? 0
-        }
-        const { error: cErr, count: cCount } = await supabase
-          .from('fh_contacts')
-          .delete({ count: 'exact' })
-          .eq('user_id', user.id)
-          .in('id', ids)
-        if (cErr) throw new Error(cErr.message)
-        total += cCount ?? 0
-      }
-
-      const { error: clErr, count: clCount } = await supabase
-        .from('fh_clients')
-        .delete({ count: 'exact' })
-        .eq('user_id', user.id)
-        .eq('source' as any, 'demo')
-      if (clErr) throw new Error(clErr.message)
-      total += clCount ?? 0
+      const total = await removeDemoData(supabase, user.id)
 
       setWipeResult(total > 0 ? `Removed ${total} sample ${countNoun(total, 'row')}.` : 'No sample data to remove.')
       toastSuccess('Sample data removed', total > 0 ? `${total} demo ${countNoun(total, 'row')} cleared` : 'Nothing to remove')
       setConfirmWipe(false)
     } catch (e: any) {
-      setWipeResult(`Couldn't remove sample data: ${e.message}`)
+      setWipeResult(plainError(e, "Couldn't remove sample data. Try again."))
     } finally {
       setWiping(false)
       setTimeout(() => setWipeResult(''), 4000)
@@ -335,7 +285,7 @@ export default function Settings() {
       hapticSuccess()
       toastSuccess(`${sectionDetails.label} saved`, 'Your changes are saved')
     } catch (error: any) {
-      toastError(`Couldn't save ${sectionDetails.label.toLowerCase()}`, error?.message || 'Try again in a moment.')
+      toastError(`Couldn't save ${sectionDetails.label.toLowerCase()}`, plainError(error, 'Try again in a moment.'))
     } finally {
       setSaving(false)
     }
@@ -381,6 +331,9 @@ export default function Settings() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+  // With a phone keyboard up, Save rides above it instead of staying at
+  // the dock's height under it.
+  const keyboardInset = useKeyboardInset()
 
   // Sidebar "Templates" item routes to /settings#templates and the
   // anchor lives on the Estimate-template picker further down the
@@ -459,7 +412,7 @@ export default function Settings() {
   const hasLocation = !!(profile?.location_lat && profile?.location_lon)
 
   const saveAction = (
-      <div className="fh-settings-save-bar">
+      <div className="fh-settings-save-bar" style={keyboardInset ? { bottom: keyboardInset + 16 } : undefined}>
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
@@ -564,7 +517,7 @@ export default function Settings() {
         id="documents"
         variants={item}
         title={<>Customer facing <em>details.</em></>}
-        sub="These details strengthen your proposals, invoices, and approvals when filled in. Only company name is needed to get started, everything else is optional and can be added anytime."
+        sub="These details appear on your proposals, invoices and approvals. Only the company name is needed to get started. Everything else is optional and can be added anytime."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <BrandField label="Company phone" optional>
@@ -603,7 +556,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Company address" optional hint="One line or several, used on cover pages.">
+          <BrandField label="Company address" optional hint="One line or several. Shown on cover pages.">
             <textarea
               rows={2}
               value={companyAddress}
@@ -646,7 +599,7 @@ export default function Settings() {
           <BrandField
             label="Brand accent color"
             optional
-            hint="The accent color on your customer documents, proposals, invoices, and statements. Leave blank to use the default."
+            hint="The accent color on your customer documents: proposals, invoices and statements. Leave blank to use the default."
           >
             <BrandColorEditor
               value={brandAccentHex}
@@ -726,10 +679,10 @@ export default function Settings() {
         id="payments"
         variants={item}
         title={<>Getting <em>paid.</em></>}
-        sub="Paste a payment link you already use, Venmo, Zelle, Square, PayPal, or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
+        sub="Paste a payment link you already use, such as Venmo, Zelle, Square, PayPal or a Stripe Payment Link. It becomes a “Pay now” button on every invoice and statement you send. Leave blank to keep collecting the way you do now."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <BrandField label="Payment link" optional hint="The page customers land on to pay you. We don't touch the money, it goes straight to your account.">
+          <BrandField label="Payment link" optional hint="The page customers land on to pay you. We don't touch the money. It goes straight to your account.">
             <input
               type="url"
               inputMode="url"
@@ -741,7 +694,7 @@ export default function Settings() {
             />
           </BrandField>
 
-          <BrandField label="Payment instructions" optional hint="Shown under the button, checks payable to, mailing address, Zelle email/phone, etc.">
+          <BrandField label="Payment instructions" optional hint="Shown under the button: who checks are payable to, a mailing address, or a Zelle email or phone.">
             <textarea
               rows={3}
               value={paymentInstructions}
@@ -906,7 +859,7 @@ export default function Settings() {
           metaTone="red"
         >
           <p style={{ margin: 0, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14 }}>
-            Clears the example clients, jobs, and activity that were loaded to show you around. Only removes sample data, your own clients and jobs are never touched.
+            Clears the example clients, jobs, and activity that were loaded to show you around. It removes only sample data. Your own clients and jobs are never touched.
           </p>
           <div style={{ marginTop: 10 }}>
             {!confirmWipe ? (
@@ -973,7 +926,15 @@ export default function Settings() {
   }
 
   return (
-    <motion.div className="fh-screen fh-settings" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: hasUnsavedChanges || saving || saved ? 56 : 0, position: 'relative' }}>
+    <motion.div
+      className="fh-screen fh-settings" variants={stagger} initial="hidden" animate="show" style={{ paddingBottom: hasUnsavedChanges || saving || saved ? 56 : 0, position: 'relative' }}
+      onKeyDown={(event) => {
+        // Enter in a field saves the section, so the keyboard can stay up.
+        if (!isEnterToSave(event) || !sectionHasProfileFields || !sectionHasChanges || saving) return
+        event.preventDefault()
+        void save()
+      }}
+    >
       {/* HEADER */}
       <motion.div variants={item} style={{ padding: '12px 24px 12px' }}>
         <Eyebrow>
@@ -1058,7 +1019,7 @@ function PushRow({ userId }: { userId?: string }) {
           Push notifications
         </div>
         <div style={{ fontSize: 14, color: 'var(--fh-ink-2)', marginTop: 2 }}>
-          {enabled ? 'On for this device' : 'Off, approvals and new leads stay silent'}
+          {enabled ? 'On for this device' : 'Off. Approvals and new leads stay silent'}
         </div>
       </div>
       <motion.button
@@ -1103,14 +1064,14 @@ function DeleteAccountRow({ onDone }: { onDone: () => void }) {
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || !body?.ok) {
-        toastError("Couldn't delete account", body?.message || body?.error || 'Try again.')
+        toastError("Couldn't delete account", plainError({ ...body, status: res.status }, 'Try again.'))
         setBusy(false)
         return
       }
       toastSuccess('Account deleted', 'Signing you out…')
       onDone()
     } catch (e: any) {
-      toastError("Couldn't delete account", e?.message || 'Try again.')
+      toastError("Couldn't delete account", plainError(e, 'Try again.'))
       setBusy(false)
     }
   }
@@ -1282,7 +1243,7 @@ const brandInputStyle: import('react').CSSProperties = {
  */
 const COLOR_PRESETS = [
   { hex: '#C9963A', name: 'FieldGold (default)' },
-  { hex: '#5C5C5C', name: 'Indigo' },
+  { hex: '#5C5C5C', name: 'Slate' },
   { hex: '#2D7A4F', name: 'Forest' },
   { hex: '#C0392B', name: 'Brick' },
   { hex: '#141414', name: 'Onyx' }
@@ -1298,7 +1259,7 @@ const ESTIMATE_TEMPLATES = [
   { key: 'classic',   name: 'Classic',   blurb: 'Editorial dark accent layout grouped by trade.', swatch: ['#141414', '#C9963A', '#F2EDE4'] },
   { key: 'slate',     name: 'Slate',     blurb: 'Gray header bar, From/For blocks, itemized rows.', swatch: ['#5C5C5C', '#F2EDE4', '#F2EDE4'] },
   { key: 'mint',      name: 'Mint',      blurb: 'Large green ESTIMATE wordmark, itemized rows.', swatch: ['#2D7A4F', '#F2EDE4', '#F2EDE4'] },
-  { key: 'editorial', name: 'Editorial', blurb: 'Sand + serif, Scope of Work and Cost Breakdown.', swatch: ['#F2EDE4', '#C9963A', '#141414'] },
+  { key: 'editorial', name: 'Editorial', blurb: 'Sand and serif, with scope of work and cost breakdown sections.', swatch: ['#F2EDE4', '#C9963A', '#141414'] },
   { key: 'fieldhorse', name: 'Fieldhorse', blurb: 'Phone first quote page with your job photo, a total, three steps and an Approve button. Customers see it on their quote link.', swatch: ['#16140F', '#C9963A', '#F2EDE4'] }
 ]
 

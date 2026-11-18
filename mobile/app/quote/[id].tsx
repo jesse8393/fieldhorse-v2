@@ -181,7 +181,7 @@ export default function QuoteScreen() {
         await queryClient.invalidateQueries({ queryKey: ['jobDetail', id] })
         await queryClient.invalidateQueries({ queryKey: ['estimates'] })
       }
-      Alert.alert('Share link copied', 'Paste it into a text or email, the customer can view and approve online.')
+      Alert.alert('Share link copied', 'Paste it into a text or email. The customer can view and approve online.')
     } catch (e: any) {
       Alert.alert("Couldn't create link", e?.message || 'Try again.')
     } finally {

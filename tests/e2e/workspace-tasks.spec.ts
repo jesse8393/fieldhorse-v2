@@ -98,16 +98,20 @@ test('a failed task read offers retry without claiming the job has no tasks', as
   await signIn(context)
   let failReads = false
   await context.route(/\/rest\/v1\/fh_job_todos(\?|$)/, route => {
-    // The job page's own read lands. The overview's task list shows those
-    // rows instead of reading them again (PERF-09), so the read that fails
-    // is the Tasks section's, opened from the overview.
+    // The job page's own read lands. The overview and the Tasks tab show
+    // the rows that read brought on this open instead of reading them
+    // again (PERF-09, vibe audit console-2). The Tasks section reads its
+    // own when the job opens from the copy saved on the phone, and that
+    // read is the one that fails.
     if (route.request().method() !== 'GET' || !failReads) return route.fallback()
     return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ message: 'Temporary test failure' }) })
   })
   await page.goto('/jobs/c-job1')
   await expect(page.getByRole('button', { name: 'Add task', exact: true })).toBeVisible()
+  // The saved copy is written at most every 2 seconds.
+  await page.waitForTimeout(2500)
   failReads = true
-  await page.getByRole('button', { name: 'Add task', exact: true }).click()
+  await page.goto('/jobs/c-job1?tab=tasks')
   const tasks = page.getByRole('region', { name: 'Tasks', exact: true })
   await expect(tasks).toContainText('Tasks could not load.')
   await expect(tasks.getByRole('button', { name: 'Try again' })).toBeVisible()

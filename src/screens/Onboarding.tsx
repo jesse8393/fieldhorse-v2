@@ -10,7 +10,10 @@ import { seedDemoData } from '../lib/demoSeed.ts'
 import SetupProgress from '../components/experience/SetupProgress.tsx'
 import BrandMark from '../components/experience/BrandMark.tsx'
 import LogoUploader from '../components/LogoUploader.tsx'
+import AuthShell from './auth/AuthShell.tsx'
+import { Button } from '../components/fh'
 import { countNoun } from '../lib/format.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const SERVICES = [
   {
@@ -190,7 +193,9 @@ export default function Onboarding() {
     [companyName, services]
   )
 
-  if (loading || membershipLoading) return null
+  // Straight after Create account, on a weak signal: paint the same
+  // loading stage the sign in screens use, never a blank white page.
+  if (loading || membershipLoading) return <AuthShell labelledBy="fh-onboarding-title" loading />
   if (isOnboarded) return <Navigate to="/" replace />
 
   // An invited teammate (any membership that is not an owner's) already
@@ -240,7 +245,7 @@ export default function Onboarding() {
     })
     if (orgErr || !ownOrgId) {
       setBusy(false)
-      setError(orgErr?.message || 'Could not create your workspace')
+      setError(plainError(orgErr, 'Your workspace was not made yet. Try again.', { kept: true, lead: true }))
       return
     }
     // Membership context fetched before the org existed, refresh it so
@@ -262,7 +267,7 @@ export default function Onboarding() {
     })
     if (profErr) {
       setBusy(false)
-      setError(profErr.message || 'Could not save profile')
+      setError(plainError(profErr, 'Your company details did not save. Try again.', { kept: true, lead: true }))
       return
     }
     if (withSeed && user?.id) {
@@ -275,7 +280,7 @@ export default function Onboarding() {
         )
       } catch (ex: any) {
         // Don't block the user, they still have a clean account, just no demo
-        toastError("Couldn't seed sample data", ex?.message || 'Continuing with empty workspace.')
+        toastError("Couldn't load sample data", plainError(ex, 'Your workspace is ready without the samples.'))
       }
     } else {
       toastSuccess('Welcome aboard', 'Your workspace is ready')
@@ -302,7 +307,7 @@ export default function Onboarding() {
     })
     setBusy(false)
     if (profErr) {
-      setError(profErr.message || 'Could not save your profile')
+      setError(plainError(profErr, 'Your details did not save. Try again.', { kept: true, lead: true }))
       return
     }
     navigate('/', { replace: true })
@@ -534,7 +539,7 @@ export default function Onboarding() {
               type="submit"
               className="fh-btn fh-btn--primary fh-onb__submit"
               disabled={!canSubmit || busy}
-              title="Recommended, seeds demo clients, jobs, and a schedule so you can see the whole app working"
+              title="Recommended. Adds demo clients, jobs and a schedule so you can see the whole app working."
             >
               {busy ? 'Saving…' : 'Start with sample data'}
             </button>
@@ -543,27 +548,15 @@ export default function Onboarding() {
             <p className="fh-onb__meta" style={{ margin: 0 }}>
               Sample data shows you the whole app immediately. Wipe anytime in Settings.
             </p>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="md"
               onClick={() => finish({ withSeed: false })}
               disabled={!canSubmit || busy}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '4px 0',
-                color: 'var(--ink-muted)',
-                fontFamily: 'var(--font-body)',
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 0,
-                cursor: (canSubmit && !busy) ? 'pointer' : 'default',
-                opacity: (canSubmit && !busy) ? 1 : 0.5,
-                textDecoration: 'underline',
-                textUnderlineOffset: 3
-              }}
             >
-              Skip, start fresh
-            </button>
+              Skip and start empty
+            </Button>
           </div>
           <p className="fh-onb__meta" style={{ marginTop: 14 }}>
             Signed in as <span>{user?.email}</span> ·{' '}

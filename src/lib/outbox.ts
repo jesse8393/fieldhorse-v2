@@ -153,7 +153,7 @@ async function putEntry(e: OutboxEntry): Promise<boolean> {
   }
 }
 
-const QUEUE_FULL = { message: "Offline storage is full, this didn't save. Reconnect to sync your queued work, then try again." }
+const QUEUE_FULL = new Error("Offline storage is full, so this didn't save. Reconnect to sync your queued work, then try again.")
 const NOTHING_UPDATED = { message: 'Nothing was changed. It may have been removed, or your role cannot edit it. Refresh and try again.', code: 'nothing_updated' }
 
 async function deleteEntry(key: string) {

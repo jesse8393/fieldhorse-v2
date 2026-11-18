@@ -4,7 +4,9 @@
 // left column holds the stage, the next stop and the day, and the right
 // column holds what needs an answer and the week strip.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
+import { expectPlain, failRest } from './helpers/rawErrors.ts'
 
 // The mock company sits in Murfreesboro, Tennessee, so the phone runs on
 // Central time and the clock is fixed: Thursday, October 8, 2026.
@@ -125,7 +127,7 @@ async function coldOpen(context: BrowserContext, page: Page) {
   await page.clock.setSystemTime(NEXT_MORNING)
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 })
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Two stops. First at 9:00.', { timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Two stops. First at 9:00 am.', { timeout: 30_000 })
   await expect(page.getByText('Friday, October 9')).toBeVisible()
   const day = page.getByRole('region', { name: 'Your day' })
   await expect(day.getByRole('listitem')).toHaveCount(2)
@@ -210,6 +212,34 @@ async function loadingThenNextStop(context: BrowserContext, page: Page) {
   return { loading, band: (await nextStop.boundingBox())!.height }
 }
 
+// dead-ends-1: two sent invoices past due on October 8, one billing Harold
+// Wickham's job and one billing the client with no job (D62). No payments,
+// so both are owed in full.
+const ROY = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com', address: '412 Burkitt Station Rd' }
+const PAST_DUE = [
+  { id: 'inv-job', contact_id: 'c-job2', title: 'Progress draw 1', amount: 6400, sequence_number: 2, issued_at: '2026-09-18T12:00:00Z', due_at: '2026-09-29T12:00:00Z' },
+  { id: 'inv-client', contact_id: null, title: 'Sidewalk patch', amount: 1800, sequence_number: 3, issued_at: '2026-09-13T12:00:00Z', due_at: '2026-09-26T12:00:00Z' }
+].map((row) => ({ user_id: 'qa-user-1', client_id: 'cl-1', status: 'sent', created_at: row.issued_at, description: null, notes: null, fh_clients: ROY, ...row }))
+
+// Remind on each past due row opens that invoice's reminder screen, never a
+// new invoice or the Jobs list.
+async function remindOpensTheReminder(context: BrowserContext, page: Page) {
+  await signIn(context, { tables: { fh_schedule: SCHEDULE, fh_invoices: PAST_DUE, fh_payments: [] } })
+  await context.route('https://api.open-meteo.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast()) })
+  )
+  await page.clock.setFixedTime(MORNING)
+  await page.goto('/?answers=all', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const answers = page.getByRole('region', { name: /Needs an answer/ })
+  const job = answers.getByRole('link', { name: 'Remind, Harold Wickham invoice is 9 days overdue' })
+  await expect(job).toHaveAttribute('href', '/invoices/inv-job/remind', { timeout: 30_000 })
+  const clientOnly = answers.getByRole('link', { name: 'Remind, Jeff Roy invoice is 12 days overdue' })
+  await expect(clientOnly).toHaveAttribute('href', '/invoices/inv-client/remind')
+  await clientOnly.click()
+  await expect(page).toHaveURL(/\/invoices\/inv-client\/remind$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Send a reminder' })).toBeVisible({ timeout: 30_000 })
+}
+
 // Tabs onto the next stop's job name and reads the rings it draws: its
 // own outline, and the one its ::after draws around the whole band.
 async function nextStopFocus(page: Page) {
@@ -233,7 +263,7 @@ test.describe('today on a phone', () => {
     await setUp(context, page, { at: MORNING })
     const headline = page.getByRole('heading', { level: 1 })
     await expect(headline).toHaveText(/stops?\.|Clear day\./)
-    await expect(headline).toHaveText('Three stops. First pour at 7:30.')
+    await expect(headline).toHaveText('Three stops. First pour at 7:30 am.')
     await expect(page.getByText('Thursday, October 8')).toBeVisible()
     await expect(page.getByText('71° and partly cloudy. Clear to work until 3 pm.')).toBeVisible()
 
@@ -302,7 +332,7 @@ test.describe('today on a phone', () => {
 
   test('eight visits all count in the headline and the day', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING, tables: { fh_schedule: EIGHT_VISITS } })
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30 am.')
     const day = page.getByRole('region', { name: 'Your day' })
     await expect(day.getByRole('listitem')).toHaveCount(8)
     await expect(day.getByText('Trench check')).toBeVisible()
@@ -310,7 +340,7 @@ test.describe('today on a phone', () => {
 
   test('with eight visits the seventh is the next stop in the afternoon', async ({ context, page }) => {
     await setUp(context, page, { at: AFTERNOON, tables: { fh_schedule: EIGHT_VISITS } })
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30 am.')
     const nextStop = page.getByRole('region', { name: 'Next stop' })
     await expect(nextStop.getByText('Next stop, 2:30 pm')).toBeVisible()
     await expect(nextStop.getByText('Harold Wickham')).toBeVisible()
@@ -320,6 +350,10 @@ test.describe('today on a phone', () => {
   test('every thing waiting counts in the evening, and See all reaches every action', async ({ context, page }) => {
     await setUp(context, page, { at: EVENING, tables: ONLY_QUIET_LEADS })
     await seeAllAnswers(page)
+  })
+
+  test('Remind on a past due invoice opens that invoice\'s reminder', async ({ context, page }) => {
+    await remindOpensTheReminder(context, page)
   })
 
   test('a cold open at 6:30 am shows the morning from last night\'s cache, without last night\'s weather', async ({ context, page }) => {
@@ -348,7 +382,7 @@ test.describe('today on a desktop', () => {
   test('shows the stage, the next stop, what needs an answer and the day', async ({ context, page }) => {
     await setUp(context, page, { at: MORNING })
     const headline = page.getByRole('heading', { level: 1 })
-    await expect(headline).toHaveText('Three stops. First pour at 7:30.')
+    await expect(headline).toHaveText('Three stops. First pour at 7:30 am.')
     await expect(page.getByText('Thursday, October 8')).toBeVisible()
     await expect(page.getByText('71° and partly cloudy. Clear to work until 3 pm.')).toBeVisible()
 
@@ -395,7 +429,7 @@ test.describe('today on a desktop', () => {
 
   test('eight visits all count, and the seventh is the next stop in the afternoon', async ({ context, page }) => {
     await setUp(context, page, { at: AFTERNOON, tables: { fh_schedule: EIGHT_VISITS } })
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30.')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eight stops. First pour at 7:30 am.')
     const day = page.getByRole('region', { name: 'Your day' })
     await expect(day.getByRole('listitem')).toHaveCount(8)
     await expect(day.getByText('Done', { exact: true })).toHaveCount(6)
@@ -495,6 +529,10 @@ test.describe('today on a desktop', () => {
     await coldOpen(context, page)
   })
 
+  test('Remind on a past due invoice opens that invoice\'s reminder', async ({ context, page }) => {
+    await remindOpensTheReminder(context, page)
+  })
+
   test('crew never see money on Today, they are sent to their own home', async ({ context, page }) => {
     await signIn(context, { role: 'crew', tables: { fh_schedule: SCHEDULE } })
     await context.route('https://api.open-meteo.com/**', (route) =>
@@ -506,4 +544,35 @@ test.describe('today on a desktop', () => {
     await expect(page.getByRole('region', { name: /Needs an answer/ })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'This week' })).toHaveCount(0)
   })
+})
+
+// raw-errors-5: Today's error card read "Home dashboard contacts failed:
+// permission denied for table fh_contacts" or "TypeError: Failed to fetch".
+test("Today's error card says what to do in plain words", async ({ context, page }) => {
+  test.setTimeout(90_000)
+  await signIn(context, { tables: { fh_schedule: SCHEDULE } })
+  await context.route('https://api.open-meteo.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast()) })
+  )
+  await failRest(context, 'fh_contacts', 'GET', 'abort')
+  await page.clock.setFixedTime(MORNING)
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const card = page.getByRole('alert').filter({ hasText: 'Today could not load' })
+  await expectPlain(card, 'No signal right now. Try again when the signal is back.')
+  await expect(card.getByRole('button', { name: /Retry/ })).toBeVisible()
+})
+
+// formats-12: one visit time reads the same way on Today, Schedule and the
+// job, always with its am or pm.
+test('a visit time reads the same on Today and Schedule, with am or pm', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'Today and the Schedule list on a phone')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(new Date('2026-11-18T12:00:00Z'))
+  await page.goto('/schedule', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Ends 11:00 am/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: /7:00 am Pour driveway/ }).first()).toBeVisible()
+  await expect(page.getByText(/\d:\d\d (AM|PM)\b/)).toHaveCount(0)
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Next stop, 7:00\s+am/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/at 7:00 am\./)
 })

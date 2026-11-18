@@ -51,6 +51,7 @@ import {
   isOwnerOrAdmin,
   canViewRoute,
 } from '../lib/permissions.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 type MembershipRow = {
   id: string
@@ -179,7 +180,7 @@ function summarize(rows: MembershipRow[], orgsById: Record<string, OrgRow>): Mem
 }
 
 function errorMessage(e: unknown, fallback: string) {
-  return e instanceof Error && e.message ? e.message : fallback
+  return plainError(e, fallback)
 }
 
 // The REST header and the org-* functions must always name the same
@@ -270,7 +271,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
 
       if (memberQuery.error) {
         console.warn('[fieldhorse] membership fetch error', memberQuery.error)
-        settle(memberQuery.error.message || 'Could not load your workspace')
+        settle(errorMessage(memberQuery.error, 'Could not load your workspace.'))
         return
       }
 
@@ -306,7 +307,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
 
       if (orgQuery.error) {
         console.warn('[fieldhorse] org fetch error', orgQuery.error)
-        settle(orgQuery.error.message || 'Could not load your workspace')
+        settle(errorMessage(orgQuery.error, 'Could not load your workspace.'))
         return
       }
 
@@ -358,7 +359,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (stale()) return
       console.warn('[fieldhorse] membership fetch failed', e)
-      settle(errorMessage(e, 'Could not load your workspace'))
+      settle(errorMessage(e, 'Could not load your workspace.'))
     }
   }, [userId])
 

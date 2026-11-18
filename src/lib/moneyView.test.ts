@@ -267,7 +267,10 @@ describe('overdue and due soon', () => {
     const view = build(bundle({ invoices: [invoice({ id: 'i1', due_at: '2026-10-07', title: 'Final balance' })] }))
     const row = view.overdue[0]
     expect(row.title).toBe('Harold Wickham')
-    expect(row.subline).toContain('Driveway replacement, final balance · Invoice 1')
+    // formats-1: the invoice reads by the number its PDF prints.
+    expect(row.subline).toBe('Driveway replacement, final balance · INV-J1-01')
+    const named = buildMoneyView({ bundle: bundle({ invoices: [invoice({ id: 'i1', due_at: '2026-10-07', title: 'Final balance' })] }), quotes: [], now: NOW, company: COMPANY, companyName: 'Parker Construction Company' })
+    expect(named.overdue[0].subline).toBe('Driveway replacement, final balance · PCC-J1-01')
     expect(row.invoiceId).toBe('i1')
     expect(row.to).toBe('/jobs/j1?tab=financials')
   })

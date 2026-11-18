@@ -31,6 +31,8 @@ import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { SCHEDULE_WEEK_START, startOfWeek } from '../lib/scheduleDates.ts'
 import { jobLabel, trayJobs } from '../lib/scheduleBoard.ts'
 import './schedule/schedule-event.css'
+import { plainError } from '../lib/serviceErrors.ts'
+import { timeOfDay } from '../lib/dates.ts'
 const SnowSchedule = lazy(() => import('../components/desktop/SnowScheduleBuild.tsx'))
 
 const VIEWS = [
@@ -43,7 +45,8 @@ function startOfDay(d: any) { const x = new Date(d); x.setHours(0,0,0,0); return
 function addDays(d: any, n: any) { const x = new Date(d); x.setDate(x.getDate() + n); return x }
 function sameDay(a: any, b: any) { return a.toDateString() === b.toDateString() }
 function fmtDate(d: any) { return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) }
-function fmtTime(iso: any) { return iso ? new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '' }
+// The one clock time format, "7:00 am" (formats-12).
+function fmtTime(iso: any) { return timeOfDay(iso) }
 
 const WEATHERBAR_TONE: Record<string, string> = { go: 'good', warn: 'ok', stop: 'poor' }
 
@@ -219,7 +222,7 @@ export default function Schedule() {
         .from('fh_schedule').select('*').eq('recurring', seriesId)
       const { data: removed, error: serr } = await supabase
         .from('fh_schedule').delete().eq('recurring', seriesId).select('id')
-      if (serr) { toastError("Couldn't delete", serr.message); return }
+      if (serr) { toastError("Couldn't delete", plainError(serr, 'Try again.')); return }
       if (!removed?.length) { toastError("Couldn't delete", 'This series was not removed. Refresh and try again.'); return }
       for (const r of removed) dropScheduleEvent((r as any).id)
       const n = removed.length
@@ -230,7 +233,7 @@ export default function Schedule() {
           const rows = (seriesRows || []).map(({ fh_contacts, ...row }: any) => row)
           if (rows.length) {
             const { error: insErr } = await supabase.from('fh_schedule').insert(rows)
-            if (insErr) { toastError("Couldn't undo", insErr.message); return }
+            if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
           }
           load(); loadUpcoming()
           toastSuccess('Restored', snapshot?.title || '')
@@ -247,7 +250,7 @@ export default function Schedule() {
     const snapshot = (events || []).find((e: any) => e.id === evtId) || (upcoming || []).find((e: any) => e.id === evtId)
     const { data: removed, error } = await supabase.from('fh_schedule').delete().eq('id', evtId).select('id')
     if (error) {
-      toastError("Couldn't delete", error.message)
+      toastError("Couldn't delete", plainError(error, 'Try again.'))
       return
     }
     if (!removed?.length) {
@@ -264,7 +267,7 @@ export default function Schedule() {
         // eslint-disable-next-line no-unused-vars
         const { fh_contacts, ...row } = snapshot
         const { error: insErr } = await supabase.from('fh_schedule').insert(row)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         load()
         loadUpcoming()
         toastSuccess('Restored', snapshot.title || '')
@@ -881,8 +884,8 @@ const PILL_FOR_STATUS: Record<string, any> = {
   'Done':        { variant: 'done',    label: 'Done' }
 }
 
-// Split "8:15 AM" into ["8:15", "AM"] for the dispatch-card time
-// column (HR stamp above, AM/PM small caption below). Falls back to
+// Split "8:15 am" into ["8:15", "am"] for the dispatch card time
+// column (hour stamp above, am or pm small caption below). Falls back to
 // the full string if no space is present.
 function splitTime(s: any) {
   if (!s) return ['\u2003', '']
@@ -1059,12 +1062,16 @@ function MobileUnscheduledJobs({ onSchedule }: { onSchedule: (job: import('../li
   const booked = useBookedVisits(user?.id, from)
   const available = jobs.data && booked.data ? trayJobs(jobs.data, booked.data.map((row) => row.contact_id), new Set()) : null
   const failed = jobs.isError || booked.isError
+  // A company with no jobs at all is not one whose jobs all have dates.
+  const hasAnyJob = (jobs.data ?? []).some((job) => ['job', 'invoice', 'closed', 'lost'].includes(job.stage || ''))
   return (
     <section className="fhev-unscheduled" aria-label="Unscheduled jobs">
       <h2>Unscheduled jobs</h2>
       {jobs.isPending || booked.isPending ? <SkeletonList rows={2} card={false} /> : <>
         {failed && <div role="alert"><p>Could not refresh unscheduled jobs.</p><Button variant="secondary" size="mini" onClick={() => { void jobs.refetch(); void booked.refetch() }}>Try again</Button></div>}
-        {available && available.length === 0 && <p>Every active job has a date.</p>}
+        {available && available.length === 0 && (hasAnyJob
+          ? <p>Every active job has a date.</p>
+          : <div><p>No jobs yet.</p><Button variant="primary" size="mini" to="/jobs/new">New job</Button></div>)}
         {available && available.length > 0 && <details><summary>Show {available.length} unscheduled jobs</summary><ul>{available.map((job) => <li key={job.id}><div><strong>{jobLabel(job)}</strong>{job.address && <p>{job.address}</p>}</div><Button variant="secondary" size="mini" aria-label={`Schedule ${jobLabel(job)}`} onClick={() => onSchedule(job)}>Schedule</Button></li>)}</ul></details>}
       </>}
     </section>

@@ -6,6 +6,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
+import { FAIL, expectPlain } from './helpers/rawErrors.ts'
+import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -112,6 +115,33 @@ test.describe('job page on a phone', () => {
     await open(page, '/jobs/c-job1')
     await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('overview')
     await expect(page.locator('.fhj-spine').getByText('Inspector confirmed Friday.')).toBeVisible()
+  })
+
+  // ai-copy-4: the open task's button and the progress label use sentence
+  // case, so the card no longer spells Mark complete two ways.
+  test('the next action and progress read in sentence case', async ({ context, page }) => {
+    await signIn(context, {
+      tables: {
+        fh_schedule: [],
+        fh_job_todos: [{ id: 't1', job_id: 'c-job1', user_id: 'qa-user-1', org_id: 'org-1', text: 'Order rebar', done: false, due_at: null, completed_at: null, assigned_to: null, created_at: new Date().toISOString() }]
+      }
+    })
+    await open(page, '/jobs/c-job1')
+    await openMoreAboutJob(page)
+    const more = page.locator('#fhj-more-body')
+    await expect(more.getByText('Order rebar')).toBeVisible()
+    await expect(more.getByText('Job progress', { exact: true })).toBeVisible()
+    expect(await more.innerText()).not.toMatch(/Mark Complete|Job Progress/)
+  })
+
+  // ai-copy-3: the empty Files and Expenses lines read as sentences.
+  test('the empty files and expenses lines read as sentences', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_files: [], fh_expenses: [] } })
+    await open(page, '/jobs/c-job1?tab=documents')
+    await expect(page.getByText('No files yet.', { exact: false })).toBeVisible()
+    await expect(page.getByText('No files yet. Upload permits, contracts, plans or anything else that supports the job.')).toBeVisible()
+    await open(page, '/jobs/c-job1?tab=expenses')
+    await expect(page.getByText('No expenses yet. Log materials, fuel and permits as you go so the margin stays real.')).toBeVisible()
   })
 
   test('every section stays one tap away', async ({ context, page }) => {
@@ -346,6 +376,50 @@ test.describe('job page on a phone', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
+  // dead-ends-8: a walk up customer's job with no phone and no address. The
+  // tiles say what is missing in words, and open the job's details to add
+  // it. Crew, who cannot edit the job, read the same reason on a still tile.
+  const BARE_JOB = {
+    id: 'c-bare', user_id: 'qa-user-1', client_id: null, stage: 'job', name: 'Walk Up Customer', job_title: 'Stoop repair',
+    amount: 2400, phone: null, email: null, address: null, notes: null, scope_text: null, milestones: [],
+    created_at: '2026-10-01T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', proposal_status: null,
+    follow_up_on: null, completed_at: null, invoice_no: null, client_name: 'Walk Up Customer'
+  }
+
+  test('with no phone or address, Call and Navigate say so and open the details to add them', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_contacts: [BARE_JOB] } })
+    await open(page, '/jobs/c-bare')
+    const quick = page.getByRole('list', { name: 'Quick actions' })
+    await expect(quick.locator('button:disabled')).toHaveCount(0)
+    const addPhone = quick.getByRole('link', { name: 'Add a phone number for Walk Up Customer' })
+    await expect(addPhone).toHaveText('Add phone')
+    await expect(quick.getByRole('link', { name: 'Add the job site address' })).toHaveText('Add address')
+    await addPhone.click()
+    await expect(page.getByLabel('Phone', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByLabel('Address', { exact: true })).toBeVisible()
+  })
+
+  test('crew read why Call and Navigate do nothing', async ({ context, page }) => {
+    await signIn(context, { role: 'crew', tables: { fh_contacts: [BARE_JOB] } })
+    await open(page, '/jobs/c-bare')
+    const quick = page.getByRole('list', { name: 'Quick actions' })
+    await expect(quick.getByRole('button', { name: 'Call, no phone on file' })).toHaveText('No phone')
+    await expect(quick.getByRole('button', { name: 'Navigate, no address on file' })).toHaveText('No address')
+  })
+
+  // dead-ends-1: a past due link Today wrote before Remind opened the
+  // reminder itself lands on the job's invoices, never on a new invoice
+  // that could bill the customer twice.
+  test('an old past due link opens the job\'s invoices, not a new invoice', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job2?tab=financials&action=nudge_invoice')
+    const cue = page.getByRole('region', { name: 'Dashboard action cue' })
+    await expect(cue).toBeVisible()
+    await cue.getByRole('button', { name: 'Open invoices' }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job2\?tab=draws$/)
+    await expect(page.getByRole('combobox', { name: 'Job section', exact: true })).toHaveValue('draws')
+  })
+
   test('lost job', async ({ context, page }) => {
     await signIn(context)
     await open(page, '/jobs/c-lost')
@@ -570,6 +644,17 @@ test.describe('job page on a desktop, redesigned', () => {
     await expect(page.getByRole('button', { name: 'Add a line' })).toBeVisible()
   })
 
+  // dead-ends-10: an invoice in the facts panel's Documents opens that
+  // invoice, from the Contract balance tab as from anywhere else.
+  test('an invoice in Documents opens the invoice', async ({ context, page }) => {
+    await signIn(context)
+    await openDesktop(page, '/jobs/c-job2?tab=financials')
+    const invoice = page.getByRole('complementary', { name: 'Job facts' }).getByRole('link', { name: /^PCC-JOB2-02, Progress draw 1/ })
+    await expect(invoice).toHaveAttribute('href', '/invoices/inv1')
+    await invoice.click()
+    await expect(page).toHaveURL(/\/invoices\/inv1$/)
+  })
+
   test('deep links and the action cue keep working', async ({ context, page }) => {
     await signIn(context)
     await openDesktop(page, '/jobs/c-job1?tab=files')
@@ -710,6 +795,23 @@ test.describe('job page on a desktop, redesigned', () => {
   })
 })
 
+// dead-ends-4: Message on a job opens Compose, whose Back returns to that
+// job. Opened straight from a link, with nothing to go back to, Back still
+// lands on the job it writes to.
+test('Compose opened from a job has a Back to the job', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByRole('link', { name: /^Message/ }).first().click()
+  await expect(page).toHaveURL(/\/compose\?contact=c-job1/, { timeout: 30_000 })
+  const back = page.locator('#fh-main').getByRole('button', { name: 'Back', exact: true })
+  await back.click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+
+  await page.goto('/compose?contact=c-job1&channel=email', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await back.click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+})
+
 // M-20 and OPS-08: Log payment keeps cents on the balance, the button and
 // the one toast it shows.
 test('Log payment shows cents and one toast', async ({ context, page }) => {
@@ -736,6 +838,40 @@ test('Log payment shows cents and one toast', async ({ context, page }) => {
   await expect(page.getByText(/\$1,234\.50/).first()).toBeVisible()
   await expect(page.getByText(/\$1,235\b/)).toHaveCount(0)
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: /payment/i })).toHaveCount(1)
+})
+
+// raw-errors-4: a gateway's 502 page showed as HTML twice, on the line and
+// in a toast, and a refusal showed the constraint's name.
+test('a failed payment on the job says what to do once, in plain words', async ({ context, page }) => {
+  await signIn(context)
+  let answer: 'gateway' | 'refuse' = 'gateway'
+  await context.route((url) => url.pathname === '/rest/v1/fh_payments', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return route.fulfill(answer === 'gateway' ? FAIL.gateway() : FAIL.check('fh_payments', 'fh_payments_kind_check'))
+  })
+  await page.goto('/jobs/c-job2/payment', { waitUntil: 'domcontentloaded' })
+  const amount = page.getByLabel('Amount')
+  await expect(amount).toBeVisible({ timeout: 30_000 })
+  await amount.fill('500')
+  await page.getByRole('button', { name: /^Record/ }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'The payment was not recorded. Something went wrong on our side. Try again in a minute.')
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: "Couldn't record payment" })).toHaveCount(0)
+  answer = 'refuse'
+  await page.getByRole('button', { name: /^Record/ }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'The payment was not recorded. Check the amount and kind, then try again.')
+  await expect(amount).toHaveValue('500')
+})
+
+// raw-errors-6: Delete job on no signal said "TypeError: Failed to fetch".
+test('Delete job on no signal says so in plain words and keeps the job', async ({ context, page }) => {
+  await signIn(context)
+  await context.route((url) => url.pathname === '/rest/v1/fh_contacts', (route) => route.request().method() === 'DELETE' ? route.abort('failed') : route.fallback())
+  await page.goto('/jobs/c-job1/more', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: 'Delete job' }).click()
+  await page.waitForTimeout(600)
+  await page.getByRole('button', { name: 'Tap again to delete' }).click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'No signal right now. Try again when the signal is back.')
+  await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
 })
 
 // M-15: the job page measures margin and health against the contract
@@ -784,6 +920,47 @@ test('a job page reads its to-dos and photos once each', async ({ context, page 
   await page.waitForLoadState('networkidle')
   expect(reads.filter(read => read === 'todos')).toHaveLength(1)
   expect(reads.filter(read => read === 'photos')).toHaveLength(1)
+})
+
+// A job opened straight on its Tasks, Contract balance or Invoices tab (a
+// link or a reload) read the same rows twice: the tab's own read came on
+// top of the job's (vibe audit console-2). One read each now feeds both.
+test.describe('a job opened on a tab reads each table once', () => {
+  async function countReads(page: Page, path: string) {
+    const reads: Record<string, number> = {}
+    page.on('request', (request) => {
+      if (request.method() !== 'GET') return
+      const url = new URL(request.url())
+      const table = url.pathname.split('/rest/v1/')[1]
+      if (!table || (url.searchParams.get('contact_id') ?? url.searchParams.get('job_id')) !== 'eq.c-job1') return
+      // Whole rows only: the desktop job panel's short list of invoice
+      // numbers and dates is a read of its own.
+      if (url.searchParams.get('select') !== '*') return
+      reads[table] = (reads[table] ?? 0) + 1
+    })
+    await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForLoadState('networkidle')
+    return reads
+  }
+
+  test('Tasks', async ({ context, page }) => {
+    await signIn(context)
+    const reads = await countReads(page, '/jobs/c-job1?tab=tasks')
+    expect(reads.fh_job_todos).toBe(1)
+  })
+
+  test('Contract balance', async ({ context, page }) => {
+    await signIn(context)
+    const reads = await countReads(page, '/jobs/c-job1?tab=financials')
+    expect({ payments: reads.fh_payments, insurance: reads.fh_insurance_claims, changeOrders: reads.fh_change_orders, invoices: reads.fh_invoices })
+      .toEqual({ payments: 1, insurance: 1, changeOrders: 1, invoices: 1 })
+  })
+
+  test('Invoices', async ({ context, page }) => {
+    await signIn(context)
+    const reads = await countReads(page, '/jobs/c-job1?tab=draws')
+    expect(reads.fh_invoices).toBe(1)
+  })
 })
 
 // Mark complete writes the closeout record and moves the job to Closed.
@@ -858,7 +1035,394 @@ test('the contract card shows cents', async ({ context, page }) => {
   await openMoreAboutJob(page)
   const card = page.locator('.cockpit-headline')
   await expect(card).toBeVisible({ timeout: 30_000 })
-  await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000')
+  await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000.00')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$5,000.50 collected')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$4,999.50 remaining')
+})
+
+// A double tap while the write is still out wrote twice: two lines for one
+// material, the bulk list twice, two inspection results for one visit. Each
+// add or save now takes no second tap until the first settles.
+test.describe('one tap writes once on the job sections', () => {
+  test.beforeEach(async ({ page: _page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'touch taps')
+  })
+
+  test('Add material sends one row', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_materials: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const name = page.getByLabel('Material name')
+    await expect(name).toBeVisible({ timeout: 30_000 })
+    await name.fill('2x4 studs')
+    await twoTaps(page, page.getByRole('button', { name: 'Add material' }))
+    await expect(page.getByText('Added', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one material').toBe(1)
+  })
+
+  test('Bulk add sends the list once', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_materials: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const bulk = page.getByRole('button', { name: /Bulk add/ })
+    await expect(bulk).toBeVisible({ timeout: 30_000 })
+    await bulk.click()
+    await page.getByLabel('Materials to add, one per line').fill('4 of 2x4 studs\n1 box of #10 screws\nDrywall mud (3)')
+    await twoTaps(page, page.getByRole('button', { name: 'Add 3', exact: true }))
+    await expect(page.getByText('Added 3 items', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one bulk insert').toBe(1)
+  })
+
+  test('Pull from notes adds the picked materials once', async ({ context, page }) => {
+    const note = { id: 'n-mat', user_id: 'qa-user-1', contact_id: 'c-job1', text: 'Need studs', category: 'note', created_at: '2026-11-10T15:00:00.000Z', parsed: { materials_needed: ['4 of 2x4 studs', 'Drywall mud (3)'] } }
+    await signIn(context, { tables: { fh_materials: [], fh_notes: [note] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const pull = page.getByRole('button', { name: /Pull from notes/ })
+    await expect(pull).toBeVisible({ timeout: 30_000 })
+    await pull.click()
+    const add = page.getByRole('button', { name: 'Add 2', exact: true })
+    await expect(add).toBeEnabled({ timeout: 10_000 })
+    await twoTaps(page, add)
+    await expect(page.getByText('Added 2', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one insert').toBe(1)
+  })
+
+  test('Save on an inspection logs one result', async ({ context, page }) => {
+    const job = {
+      id: 'c-job1', stage: 'job', name: 'Plumbing Bellevue', job_title: 'Slab + trench', amount: 33100,
+      user_id: 'qa-user-1', client_id: null, phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
+      created_at: '2026-09-20T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+      proposal_status: null, milestones: [], follow_up_on: null, notes: null, scope_text: null, has_inspections: true
+    }
+    await signIn(context, { tables: { fh_contacts: [job], fh_inspections: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_inspections')
+    await holdPosts(context, '**/rest/v1/fh_inspections*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=inspections', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const trade = page.getByRole('button', { name: /^Concrete/ }).first()
+    await expect(trade).toBeVisible({ timeout: 30_000 })
+    await trade.click()
+    const form = page.locator('form[aria-label="Log Concrete"]')
+    await expect(form).toBeVisible()
+    await twoTaps(page, form.getByRole('button', { name: 'Save' }))
+    await expect(form).toHaveCount(0, { timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one inspection').toBe(1)
+  })
+})
+
+// Send certificate kept its busy state on the closeout screen. Leave it
+// while the email is still going out and come back, and the button was
+// free again: one more tap emailed the completion certificate twice. The
+// send is now kept app wide, so the certificate is busy until it lands.
+test('leaving the closeout while the certificate emails and coming back does not email it twice', async ({ context, page }) => {
+  const closeout = {
+    id: 'co1', user_id: 'qa-user-1', contact_id: 'c-done', warranty_start_date: '2026-09-20', warranty_months: 12,
+    signoff_method: 'verbal', signoff_name: 'Danielle Ortiz', notes: 'Walkthrough done.', final_amount: 9600, created_at: '2026-10-28T15:00:00.000Z'
+  }
+  await signIn(context, { tables: { fh_closeouts: [closeout] } })
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/certificate.pdf' } }))
+  const sends = postsTo(context, '/api/send-certificate')
+  await holdPosts(context, '**/api/send-certificate', 6000, () => ({ status: 200, json: { ok: true } }))
+  await page.goto('/jobs/c-done/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const send = page.getByRole('button', { name: 'Send certificate' })
+  await expect(send).toBeEnabled({ timeout: 30_000 })
+  await send.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  await goInApp(page, '/jobs/c-done')
+  await page.waitForTimeout(800)
+  await goInApp(page, '/jobs/c-done/complete')
+  const again = page.getByRole('button', { name: 'Send certificate' })
+  await expect(again).toBeVisible({ timeout: 30_000 })
+  // Once the screen has read what it needs, the button takes a tap or says it is busy.
+  await expect.poll(async () => await again.isEnabled() || await again.getAttribute('aria-busy') === 'true', { timeout: 30_000 }).toBe(true)
+  const busy = await again.getAttribute('aria-busy')
+  await again.click({ force: true })
+  await page.waitForTimeout(1500)
+  expect(sends.length, 'one certificate, one email').toBe(1)
+  expect(busy, 'Send certificate shows the email going out').toBe('true')
+})
+
+// formats-6: a whole amount prints .00 on the job the way the invoice page
+// and the PDF print it, so $6,400 never sits next to $6,400.00.
+test('whole amounts keep .00 on Log payment and the Invoices tab', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/jobs/c-job2/payment', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Balance $6,400.00')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: 'Record $6,400.00' })).toBeVisible()
+  await page.goto('/jobs/c-job2?tab=draws', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/Unbilled/).first()).toBeVisible({ timeout: 30_000 })
+  const text = await page.locator('main').innerText()
+  expect(text).toContain('$6,400.00')
+  expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
+})
+
+// formats-9: an expense date reads like every other date on the job
+// ("Nov 12, 2026"), never as raw "2026-11-12".
+test('the Expenses tab prints the expense date as a date', async ({ context, page }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_expenses: [{ id: 'e-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', description: 'Rebar and chairs', amount: 412.38, category: 'Materials', expense_date: '2026-11-12', created_at: '2026-11-12T18:00:00Z' }] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=expenses', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Rebar and chairs')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Materials · Nov 12, 2026')).toBeVisible()
+  await expect(page.getByText(/2026-11-12/)).toHaveCount(0)
+})
+
+// formats-12: the job's spine writes a time with its am or pm, so a payment
+// logged at 8:15 pm never reads as "8:15" beside a morning visit.
+test('the job spine writes an evening payment as 8:15 pm', async ({ context, page }, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('mobile'), 'Phone layout')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/jobs/c-h')
+  const spine = page.locator('.fhj-spine')
+  await expect(spine.getByText('8:15 pm', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(spine.getByText('8:15', { exact: true })).toHaveCount(0)
+})
+
+// formats-4: a sub's rate and the insurance claim's figures print to the
+// cent on the job, the way SubDetail and the customer document print them,
+// and the wide desktop job rail names each job's amount in full.
+test('the job prints sub rates, insurance figures and the rail amount to the cent', async ({ context, page }, testInfo) => {
+  await signIn(context, { tables: {
+    ...FORMATS_TABLES,
+    fh_subs: [{ id: 'sub-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', name: 'Tri-Star Pumping', trade: 'Pump truck', phone: null, rate: 42.5, status: 'scheduled', created_at: '2026-11-10T12:00:00Z' }],
+    fh_insurance_claims: [{ id: 'ins-h1', user_id: 'qa-user-1', org_id: 'org-1', contact_id: 'c-h', claim_number: 'CL-1', carrier: 'State Farm', adjuster: null, deductible: 1000.5, rcv: 24800, acv: 18200.25, depreciation: 6599.75, supplement_amount: null, mortgage_company: null, created_at: '2026-11-10T12:00:00Z' }]
+  } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=subs', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Tri-Star Pumping').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$42.50', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText('$43', { exact: true })).toHaveCount(0)
+  await page.goto('/jobs/c-h?tab=insurance', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('$1,000.50', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('$24,800.00', { exact: true }).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.getByText('$1,001', { exact: true })).toHaveCount(0)
+  if (testInfo.project.name.startsWith('desktop')) {
+    await page.setViewportSize({ width: 1720, height: 1000 })
+    const rail = page.locator('.fh-detail-rail')
+    await expect(rail.getByText('$12,345.50', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(rail.getByText(/\$\d+(\.\d)?K\b/)).toHaveCount(0)
+  }
+})
+
+// formats-12: the job's own Schedule tab writes the visit time as 7:00 am,
+// the way the spine and Today write it, never "7:00 AM".
+test('the job Schedule tab writes the visit time as 7:00 am', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/jobs/c-h?tab=schedule', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('Pour driveway').filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/7:00 am/).filter({ visible: true }).first()).toBeVisible()
+  await expect(page.locator('main').getByText(/\d:\d\d\s?(AM|PM)\b/)).toHaveCount(0)
+})
+
+// Finding lost-work-2: a half written daily log or job note is not lost to
+// a reload or a tap on another section.
+const TYPED = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+const jobSections = (page: Page) => page.getByRole('combobox', { name: 'Job section', exact: true })
+async function openJob(page: Page, path: string) {
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(jobSections(page)).toBeVisible({ timeout: 30_000 })
+}
+
+test.describe('typed words in the job sections', () => {
+  const WORDS = TYPED
+  const sections = jobSections
+
+  test('a half written daily log survives a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: '+ New log' }).click()
+    await page.getByLabel('Site summary').fill(WORDS)
+    await page.getByLabel('Crew on site (optional)').fill('4')
+    await sections(page).selectOption('tasks')
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await sections(page).selectOption('logs')
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByLabel('Crew on site (optional)')).toHaveValue('4')
+    await page.reload()
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    // Cancel throws the draft away for good.
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.reload()
+    await expect(page.getByRole('button', { name: '+ New log' })).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+  })
+
+  // Review of lost-work-2: an edit to a saved log is kept against that log,
+  // and only once something in it changed.
+  const SAVED_LOG = {
+    id: 'log-saved-1', user_id: 'qa-user-1', contact_id: 'c-job1', log_date: '2026-10-09', summary: 'Formed and set rebar',
+    next_steps: null, weather_text: null, crew_count: 3, hours_worked: null, photos: [], created_at: '2026-10-09T15:00:00.000Z'
+  }
+
+  test('opening a saved daily log to edit it keeps nothing until something changes', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveValue(SAVED_LOG.summary)
+    await page.waitForTimeout(600)
+    await page.reload()
+    await expect(page.getByRole('button', { name: '+ New log' })).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
+  test('an edit to a saved daily log comes back after a reload and saves to that log', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await page.getByLabel('Site summary').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    const writes: string[] = []
+    page.on('request', (request) => { if (/\/rest\/v1\/fh_daily_logs/.test(request.url()) && request.method() !== 'GET') writes.push(request.method()) })
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    expect(writes).toEqual(['PATCH'])
+  })
+
+  test('an edit to a daily log saved differently since is dropped', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await context.addInitScript(() => {
+      if (localStorage.getItem('e2e:stale-log')) return
+      localStorage.setItem('e2e:stale-log', '1')
+      const base = { summary: 'An older summary', nextSteps: '', weatherText: '', crewCount: '3', hoursWorked: '', photos: [] }
+      localStorage.setItem('fh:draft:edit:job-log:log-saved-1', JSON.stringify({ form: { summary: 'Edit made before the log changed' }, base, savedAt: Date.now(), userId: 'qa-user-1' }))
+    })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await expect(page.getByText(SAVED_LOG.summary)).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('fh:draft:edit:job-log:log-saved-1'))).toBeNull()
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveValue(SAVED_LOG.summary)
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
+  test('a half written job note survives a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?tab=messages')
+    const box = page.getByPlaceholder('Log a note, call, touchpoint…')
+    await box.fill(WORDS)
+    await sections(page).selectOption('tasks')
+    await expect(box).toHaveCount(0)
+    await sections(page).selectOption('messages')
+    await expect(box).toHaveValue(WORDS)
+    await page.reload()
+    await expect(page.getByPlaceholder('Log a note, call, touchpoint…')).toHaveValue(WORDS)
+  })
+})
+
+// Finding lost-work-6: Edit job details keeps its edits through a stray
+// tap on another section and a reload.
+test.describe('typed words in edit job details', () => {
+  const WORDS = TYPED
+  const sections = jobSections
+
+  test('edit job details keeps its edits through a tap on another section and a reload', async ({ context, page }) => {
+    await signIn(context)
+    await openJob(page, '/jobs/c-job1?edit=1')
+    const form = page.getByRole('form', { name: 'Edit job details' })
+    await form.getByLabel('Scope notes').fill(WORDS)
+    await sections(page).selectOption('tasks')
+    await sections(page).selectOption('overview')
+    await expect(page.getByRole('form', { name: 'Edit job details' }).getByLabel('Scope notes')).toHaveValue(WORDS)
+    await page.reload()
+    await expect(page.getByRole('form', { name: 'Edit job details' }).getByLabel('Scope notes')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    // Cancel closes the edit and forgets it.
+    await page.getByRole('form', { name: 'Edit job details' }).getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('form', { name: 'Edit job details' })).toHaveCount(0)
+    await page.reload()
+    await expect(sections(page)).toBeVisible()
+    await expect(page.getByRole('form', { name: 'Edit job details' })).toHaveCount(0)
+  })
+})
+
+// Finding lost-work-8: a milestone the server refuses stays in the box.
+/** Answers one table's writes with a server refusal. */
+async function refuseWrites(context: import('@playwright/test').BrowserContext, table: string) {
+  const hits = { count: 0 }
+  await context.route((url) => url.pathname === `/rest/v1/${table}`, (route) => {
+    if (route.request().method() !== 'PATCH') return route.fallback()
+    hits.count += 1
+    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: '57014', message: 'canceling statement due to statement timeout', details: null, hint: null }) })
+  })
+  return hits
+}
+
+test.describe('a milestone that fails to save', () => {
+  test('a milestone the server refuses stays in the box', async ({ context, page }) => {
+    await signIn(context)
+    const refused = await refuseWrites(context, 'fh_contacts')
+    await openJob(page, '/jobs/c-job1?tab=details')
+    const box = page.getByPlaceholder('Add milestone…')
+    await box.fill('Forms inspected before pour')
+    await page.getByRole('button', { name: 'Add milestone' }).click()
+    await expect.poll(() => refused.count).toBeGreaterThan(0)
+    await expect(page.getByText("Couldn't save", { exact: false }).first()).toBeVisible()
+    await expect(box).toHaveValue('Forms inspected before pour')
+  })
+})
+
+// Finding lost-work-9: a photo caption the server refuses stays in the field.
+test.describe('a photo caption that fails to save', () => {
+  test('a photo caption the server refuses stays in the field', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_job_files: [{
+      id: 'ph-1', user_id: 'qa-user-1', job_id: 'c-job1', contact_id: 'c-job1', kind: 'photo', storage_path: 'qa-user-1/c-job1/a.jpg',
+      filename: 'a.jpg', caption: 'Old caption', section_tag: null, size: 1000, mime_type: 'image/jpeg', uploaded_at: new Date().toISOString(), created_at: new Date().toISOString()
+    }] } })
+    const refused = await refuseWrites(context, 'fh_job_files')
+    await openJob(page, '/jobs/c-job1?tab=files&photo=ph-1')
+    const caption = page.getByRole('textbox', { name: 'Photo caption' })
+    await expect(caption).toHaveValue('Old caption')
+    await caption.fill('Rebar tied at 12 inch centers')
+    await caption.blur()
+    await expect.poll(() => refused.count).toBeGreaterThan(0)
+    await expect(page.getByText("Couldn't save caption")).toBeVisible()
+    await page.waitForTimeout(1500)
+    await expect(caption).toHaveValue('Rebar tied at 12 inch centers')
+  })
+})
+
+// Finding lost-work-12: the closing note on Mark complete survives a reload.
+test.describe('typed words on Mark complete', () => {
+  const WORDS = TYPED
+
+  test('the closing note on Mark complete survives a reload', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/jobs/c-job2/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.getByLabel('Closing note').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toHaveValue(WORDS)
+  })
+
+  // Review of lost-work-12: a closeout that could not be read is not a
+  // reason to throw the closing note away.
+  test('a closing note edit is kept when the closeout cannot be read', async ({ context, page }) => {
+    const closeout = { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-job2', notes: 'Saved closing note', warranty_months: 12, warranty_start_date: '2026-10-01', signoff_method: 'verbal', signoff_name: 'Dana', created_at: '2026-10-01T15:00:00.000Z' }
+    await signIn(context, { tables: { fh_closeouts: [closeout] } })
+    await page.goto('/jobs/c-job2/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByLabel('Closing note')).toHaveValue(closeout.notes)
+    await page.getByLabel('Closing note').fill(WORDS)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('fh:draft:edit:closeout:c-job2'))).not.toBeNull()
+    const refused = (route: Route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'XX000', message: 'upstream timeout' }) })
+    await context.route('**/rest/v1/fh_closeouts**', refused)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toBeVisible()
+    await page.waitForTimeout(800)
+    expect(await page.evaluate(() => localStorage.getItem('fh:draft:edit:closeout:c-job2'))).not.toBeNull()
+    await context.unroute('**/rest/v1/fh_closeouts**', refused)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toHaveValue(WORDS)
+  })
 })

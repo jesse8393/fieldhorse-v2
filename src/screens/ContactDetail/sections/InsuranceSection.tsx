@@ -21,8 +21,10 @@ import { Shield, Save as SaveIcon, X, Trash2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { useSecondTap } from '../../../lib/secondTap.ts'
+import { moneyCents } from '../../../lib/format.ts'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const FIELDS = [
   { key: 'claim_number',     label: 'Claim number',     type: 'text',  placeholder: 'CL-2026-04812' },
@@ -137,7 +139,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
       onChange?.(data)
       setEditing(false)
     } catch (e: any) {
-      toastError("Couldn't save insurance", e?.message || 'Try again.')
+      toastError("Couldn't save insurance", plainError(e, 'Try again.'))
     } finally {
       setSaving(false)
     }
@@ -155,7 +157,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
       toastSuccess('Insurance removed', '')
       onChange?.(null)
     } catch (e: any) {
-      toastError("Couldn't remove insurance", e?.message || 'Try again.')
+      toastError("Couldn't remove insurance", plainError(e, 'Try again.'))
     } finally {
       setDeleting(false)
     }
@@ -193,7 +195,7 @@ export default function InsuranceSection({ contact, userId, insurance, onChange 
               <div key={f.key}>
                 <div style={labelStyle()}>{f.label}</div>
                 <div style={valueStyle()}>
-                  {f.type === 'money' ? formatMoney(v) : String(v)}
+                  {f.type === 'money' ? moneyCents(v) : String(v)}
                 </div>
               </div>
             )
@@ -364,12 +366,3 @@ function dangerGhostBtnStyle() {
   }
 }
 
-function formatMoney(n: any) {
-  const v = Number(n || 0)
-  return v.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  })
-}

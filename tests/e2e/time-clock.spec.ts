@@ -1,6 +1,8 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { expectPlain } from './helpers/rawErrors.ts'
+import { holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
 
 // The job page's time clock (TimeClockCard) when the shift it shows was
 // ended somewhere else first. Clock out never moves an ended shift's end
@@ -148,6 +150,21 @@ test('a failed clock in on Crew home says so in plain words', async ({ context, 
   await expect(toaster).not.toContainText('row-level security')
 })
 
+// raw-errors-11: Crew home said a failed clock in plainly, but the job
+// page's clock still showed "TypeError: Failed to fetch".
+test('a failed clock in on the job page says so in plain words', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [] } })
+  await context.route((url) => url.pathname === '/rest/v1/fh_time_punches', (route) => route.request().method() === 'POST' ? route.abort('failed') : route.fallback())
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await page.getByRole('button', { name: 'More about this job' }).click()
+  const clockIn = page.getByRole('button', { name: /^Clock in/ })
+  await expect(clockIn).toBeVisible({ timeout: 15_000 })
+  await clockIn.click()
+  const toaster = page.locator('[data-sonner-toaster]')
+  await expectPlain(toaster, "Couldn't clock in")
+  await expectPlain(toaster, 'No signal right now. Try again when the signal is back.')
+})
+
 // OPS-22: Log time and Keep running were 36 pixels high.
 test('the job clock buttons are at least 44 pixels high', async ({ context, page }) => {
   await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [openPunch()] } })
@@ -158,4 +175,56 @@ test('the job clock buttons are at least 44 pixels high', async ({ context, page
     const box = await page.getByRole('button', { name, exact: true }).boundingBox()
     expect(box!.height, name).toBeGreaterThanOrEqual(44)
   }
+})
+
+// A double tap on Clock in on the job card, while the location wait and the
+// insert are still out, made a second punch. The one active shift index
+// refused it and the card showed the running meter next to "Already on the
+// clock". One tap is one punch, and the card says it is working.
+test('a double tap on Clock in on the job card makes one punch and no false error', async ({ context, page }) => {
+  test.setTimeout(60_000)
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [] } })
+  const posts = postsTo(context, '/rest/v1/fh_time_punches')
+  const started = new Date().toISOString()
+  await holdPosts(context, '**/rest/v1/fh_time_punches*', 1200, (n) => n === 1
+    ? { status: 201, json: { ...openPunch(), id: 'tp-new', punch_in_at: started, created_at: started, updated_at: started } }
+    : { status: 409, json: { code: '23505', details: null, hint: null, message: 'duplicate key value violates unique constraint "fh_time_punches_one_active_per_user"' } })
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await page.getByRole('button', { name: 'More about this job' }).click()
+  const clockIn = page.getByRole('button', { name: 'Clock in', exact: true })
+  await expect(clockIn).toBeVisible({ timeout: 15_000 })
+  await twoTaps(page, clockIn)
+  // While the punch is out the button says so and takes no tap.
+  const busy = page.getByRole('button', { name: 'Clocking in…', exact: true })
+  const busyWhileOut = (await busy.count()) === 1 && await busy.isDisabled()
+  await expect(page.getByRole('button', { name: 'Clock out', exact: true })).toBeVisible({ timeout: 15_000 })
+  await page.waitForTimeout(1500)
+  expect(posts.length, 'one tap, one punch').toBe(1)
+  await expect(page.getByText('Already on the clock', { exact: true })).toHaveCount(0)
+  expect(busyWhileOut, 'Clock in shows it is working').toBe(true)
+})
+
+// formats-7: a 3 hour shift at $42.50 an hour reads as money everywhere the
+// card writes it, and the labor cost row it saves keeps that wording.
+test('the owner clocking out at $42.50 an hour sees and books money with cents', async ({ context, page }) => {
+  const now = new Date('2026-11-17T20:30:00Z')
+  await page.clock.setFixedTime(now)
+  const started = new Date(now.getTime() - 3 * HOUR).toISOString()
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [{ ...openPunch(), punch_in_at: started, created_at: started, updated_at: started }], fh_expenses: [] } })
+  const posted: Array<Record<string, unknown>> = []
+  await context.route((url) => url.pathname === '/rest/v1/fh_expenses', (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON()
+      posted.push(Array.isArray(body) ? body[0] : body)
+    }
+    return route.fallback()
+  })
+  await (await openClock(page)).click()
+  await page.getByLabel(/Hourly rate/i).fill('42.50')
+  await expect(page.getByText('$127.50', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Log time', exact: true }).click()
+  const toast = page.getByText('Time logged', { exact: true }).locator('xpath=..')
+  await expect(toast).toContainText('3.00 hrs · $127.50')
+  await expect.poll(() => posted.length).toBe(1)
+  expect(posted[0].description).toBe('Labor, 3.00 hrs @ $42.50/hr')
 })

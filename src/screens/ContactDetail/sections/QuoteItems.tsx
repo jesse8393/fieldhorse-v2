@@ -12,6 +12,7 @@ import { Eyebrow } from '../../../components/v3'
 import { planReorder } from './quoteItemOrder.ts'
 import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { lineTotal, roundCents } from '../../../lib/quoteMoney.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 /**
  * Quote items section, fh_quote_items CRUD editor.
@@ -503,7 +504,7 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
       .delete()
       .eq('id', id)
     if (error) {
-      toastError("Couldn't delete item", error.message)
+      toastError("Couldn't delete item", plainError(error, 'Try again.'))
       // The line was not deleted: put it back where it was now, so a reread
       // that fails too cannot leave it hidden.
       if (snapshot) {
@@ -518,7 +519,7 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_quote_items').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         await fetchRows({ silent: true })
         onContactRefresh?.()
         toastSuccess('Restored')
@@ -550,7 +551,7 @@ export function useQuoteItems({ jobId, quoteId, userId, onContactRefresh, onLoad
     ))
     const failedWrite = results.find((r) => r.error)
     if (failedWrite?.error) {
-      toastError("Couldn't reorder", failedWrite.error.message)
+      toastError("Couldn't reorder", plainError(failedWrite.error, 'Try again.'))
       // The move did not save: put the lines back in their order now,
       // unless something else changed them meanwhile. The reread settles
       // any write of the move that did land.

@@ -11,6 +11,8 @@ import { allocateInvoiceDue, invoicesPaidInFull, knownContractTotal, type DueInv
 import { toCents, sumCents } from './cents.ts'
 import { todayYmd } from './dates.ts'
 import type { Database } from './database.types.ts'
+import { plainError } from './serviceErrors.ts'
+import { endSendIntent, sendIntent, sendKey } from './invoiceSends.ts'
 
 // pdf.js pulls in jspdf (~390KB). Load it lazily at call time so merely
 // importing this module (Invoices, ClientDetail, PublicDoc route graphs)
@@ -125,6 +127,20 @@ export async function retryOnce<T extends { error: unknown }>(run: () => Promise
   return run()
 }
 
+/**
+ * One query per job for its invoices, shared by the job screen, its
+ * Contract balance and its Invoices tab, so opening a tab never reads them
+ * twice (vibe audit console-2). Under the job's own key, so whatever
+ * refreshes the job reads them again.
+ */
+export const jobInvoicesKey = (jobId: string | null | undefined) => ['jobDetail', jobId, 'invoices'] as const
+
+export async function readJobInvoices(jobId: string) {
+  const { data, error } = await fetchInvoicesForContact(jobId)
+  if (error) throw error
+  return data
+}
+
 export async function fetchInvoicesForContact(contactId: string) {
   const rows: InvoiceRow[] = []
   for (let from = 0; ; from += 500) {
@@ -198,7 +214,7 @@ export function invalidateAfterInvoiceCreate(
   if (clientId) void client.invalidateQueries({ queryKey: ['clientDetail', clientId] })
   if (jobId) {
     void client.invalidateQueries({ queryKey: ['invoiceDetail', jobId] })
-    void client.invalidateQueries({ queryKey: ['invoiceDraws', jobId] })
+    // Also the job's invoices (jobInvoicesKey), which sit under its key.
     void client.invalidateQueries({ queryKey: ['jobDetail', jobId] })
   }
 }
@@ -401,7 +417,7 @@ export function invoicePdfInput({ invoice, contact, client = null, company, paym
       job_title: `${title}, ${recipient.job_title || 'Construction services'}`
     },
     // pdf.js maps line item `description` → the narrow bold
-    // Product/Service column and `notes` → the wide Description column.
+    // Item column and `notes` → the wide Description column.
     // Title goes narrow, the human-readable description goes wide so it
     // only wraps when it actually runs out of room.
     lineItems: [{ description: title, notes: description, qty: 1, rate: invoice.amount, amount: invoice.amount }],
@@ -469,34 +485,47 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
 
   // One figure for the email and the PDF it attaches.
   const amountDue = invoiceAmountDue({ invoice, contact: job, payments, changeOrders, invoices })
-  const result = await buildInvoicePdf({ invoice, contact: job, client, company, payments, changeOrders, insurance, invoices, amountDue })
-  if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
+  const build = () => buildInvoicePdf({ invoice, contact: job, client, company, payments, changeOrders, insurance, invoices, amountDue })
+  // One send id per send, kept for every retry until the email goes out or
+  // the invoice, its amount due or its recipient changes. A retry sends the
+  // same id and the PDF the first try uploaded, so after an unclear failure
+  // the server's provider key is the same and the customer gets one email.
+  const key = sendKey.invoice(invoice.id)
+  const intent = sendIntent(key, JSON.stringify([invoice.updated_at, recipient, amountDue]))
+  let result: any = null
+  let file = intent.upload
+  if (!file) {
+    result = await build()
+    if (!result?.doc) return { ok: false, reason: 'error', message: 'The invoice PDF could not be made. Try again.' }
 
-  const blob = result.doc.output('blob')
-  const rowId = createUuid()
-  // Under the sender's own folder either way (the server checks that); a
-  // job's PDF sits with the job's files, a client's under its invoice.
-  const path = job ? `${userId}/${job.id}/${rowId}.pdf` : `${userId}/invoices/${invoice.id}/${rowId}.pdf`
-  const { error: upErr } = await supabase.storage
-    .from('job-files')
-    .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-  if (upErr) return { ok: false, reason: 'error', message: `Couldn't save the invoice PDF: ${upErr.message}` }
+    const blob = result.doc.output('blob')
+    const rowId = createUuid()
+    // Under the sender's own folder either way (the server checks that); a
+    // job's PDF sits with the job's files, a client's under its invoice.
+    const path = job ? `${userId}/${job.id}/${rowId}.pdf` : `${userId}/invoices/${invoice.id}/${rowId}.pdf`
+    const { error: upErr } = await supabase.storage
+      .from('job-files')
+      .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+    if (upErr) return { ok: false, reason: 'error', message: plainError(upErr, 'The invoice PDF could not be saved, so nothing was sent. Try again.') }
+    file = { path, filename: result.filename }
+    intent.upload = file
 
-  // Audit row on the job, best-effort, never blocks the send.
-  if (job) {
-    try {
-      await supabase.from('fh_job_files').insert({
-        id: rowId,
-        user_id: userId,
-        job_id: job.id,
-        filename: result.filename,
-        storage_path: path,
-        mime_type: 'application/pdf',
-        size_bytes: blob.size || 0,
-        kind: 'file'
-      })
-    } catch (e) {
-      console.warn('[invoices] fh_job_files row insert failed', e)
+    // Audit row on the job, best-effort, never blocks the send.
+    if (job) {
+      try {
+        await supabase.from('fh_job_files').insert({
+          id: rowId,
+          user_id: userId,
+          job_id: job.id,
+          filename: result.filename,
+          storage_path: path,
+          mime_type: 'application/pdf',
+          size_bytes: blob.size || 0,
+          kind: 'file'
+        })
+      } catch (e) {
+        console.warn('[invoices] fh_job_files row insert failed', e)
+      }
     }
   }
 
@@ -512,8 +541,9 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
       sender_user_id: userId,
       recipient_email: recipient,
       recipient_name: to.name || null,
-      storage_path: path,
-      filename: result.filename,
+      storage_path: file.path,
+      filename: file.filename,
+      send_id: intent.id,
       amount_due: amountDue,
       // What the email says the invoice is for, the same words as the PDF.
       description: invoiceDescription(invoice, job)
@@ -523,14 +553,15 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
 
   if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
     const { downloadPdf } = await loadPdf()
-    downloadPdf(result)
+    downloadPdf(result ?? await build())
     return { ok: false, reason: 'sender_not_configured' }
   }
   if (!sendRes.ok || !sendBody?.ok) {
-    const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-    const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-    return { ok: false, reason: 'error', message: `Delivery stopped${status}: ${detail}` }
+    // The provider's words and status go to the log, not the screen (raw-errors-7).
+    return { ok: false, reason: 'error', message: plainError({ ...sendBody, status: sendRes.status }, 'The invoice was not sent. Try again.') }
   }
+  // The email went out: the next send of this invoice is a new one.
+  endSendIntent(key, intent)
 
   // Don't downgrade a paid invoice just because the PDF was sent again.
   // `invoice` is the row as it was when this send started, and the email
@@ -550,7 +581,7 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
       statusError = flipErr
     }
   }
-  return { ok: true, filename: result.filename, recipient, statusError }
+  return { ok: true, filename: file.filename, recipient, statusError }
 }
 
 // Suggested next invoice for a job, drives the new invoice screen's

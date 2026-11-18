@@ -22,11 +22,12 @@ import { createUuid } from '../../../lib/uuid.ts'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, FileEdit, Send, Download, Check, X, Trash2, FileText } from 'lucide-react'
 import { supabase, authHeaders } from '../../../lib/supabase.ts'
 import { parseDateOnly, toYmd } from '../../../lib/dates.ts'
 import { useDocumentProfile } from '../../../lib/companyBranding.ts'
+import { endSendIntent, sendIntent, sendKey, startInvoiceSend, useInvoicesSending } from '../../../lib/invoiceSends.ts'
 import { useAuth } from '../../../contexts/AuthContext.tsx'
 // Loaded on the first PDF action, never with the screen: jsPDF stays out
 // of the service worker precache and of the Financials tab's own chunk.
@@ -36,11 +37,12 @@ import { toastSuccess, toastError } from '../../../lib/toast.ts'
 // them, so a generated $1,249.75 draw never reads "$1,250".
 import { money } from '../../../components/documents/format.ts'
 import { useArmedId } from '../../../lib/secondTap.ts'
+import { invoiceReference } from '../../../lib/invoiceReference.ts'
 import { Eyebrow } from '../../../components/v3'
 import { countNoun } from '../../../lib/format.ts'
 import { fetchInvoiceReviewContext } from '../../../lib/invoiceReviewContext.ts'
 import { reviewInvoice } from '../../../lib/invoiceReview.js'
-import { billTo, fetchInvoicesForContact, invoiceAmountDue, invoiceDescription, retryOnce } from '../../../lib/invoices.ts'
+import { billTo, invoiceAmountDue, invoiceDescription, jobInvoicesKey, readJobInvoices, retryOnce } from '../../../lib/invoices.ts'
 import { invoicesPaidInFull } from '../../../lib/invoiceSettlement.ts'
 import { drawsFromTerms } from '../../../lib/paymentSchedule.ts'
 import { quoteMoney } from '../../../lib/quoteMoney.ts'
@@ -49,7 +51,10 @@ import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
 import { useMediaQuery } from '../../../lib/useMediaQuery.ts'
 import { moneyInput } from '../../new/CreateShell.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
+
+const NO_DRAWS: any[] = []
 
 function shortDate(iso: any) {
   const d = parseDateOnly(iso)
@@ -83,14 +88,30 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const documentProfile = useDocumentProfile(contact?.org_id)
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [draws, setDraws] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  // A failed read shows an empty list, which must not offer "Generate
-  // from terms" on a job that may already have draws.
-  const [loadFailed, setLoadFailed] = useState(false)
+  // The job's invoices come from the job screen's own query (one read per
+  // job, vibe audit console-2). A failed read must not offer "Generate
+  // from terms" on a job that may already have draws, and neither may a
+  // read still on its way after a change.
+  const contactId = contact?.id
+  const drawsQuery = useQuery({
+    queryKey: jobInvoicesKey(contactId),
+    queryFn: () => readJobInvoices(contactId as string),
+    enabled: !!contactId
+  })
+  const draws: any[] = drawsQuery.data ?? NO_DRAWS
+  const loading = drawsQuery.isPending
+  const loadFailed = drawsQuery.isError
+  const drawsError = drawsQuery.error
+  useEffect(() => {
+    if (drawsError) toastError("Couldn't load draws", plainError(drawsError, 'Try again.'))
+  }, [drawsError])
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
   const [busyId, setBusyId] = useState<any>(null)
+  // A draw's email is kept app wide (lib/invoiceSends), so a draw whose
+  // email is going out from the job's money view or its own screen is busy
+  // here too.
+  const sendingIds = useInvoicesSending()
   // The draw a payment is being recorded against, and what is still owed
   // on it, while the payment sheet is open.
   // Any owner, admin or manager of the job's company may edit, not only
@@ -116,18 +137,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
   const drawsIssued = liveDraws.reduce((s, d) => s + Number(d.amount || 0), 0)
   const unbilled = Math.max(0, contractTotal - drawsIssued)
 
-  const contactId = contact?.id
   const fetchDraws = useCallback(async () => {
     if (!contactId) return
-    setLoading(true)
-    const { data, error } = await fetchInvoicesForContact(contactId)
-    if (error) toastError("Couldn't load draws", error.message)
-    setDraws(data || [])
-    setLoadFailed(!!error)
-    setLoading(false)
-  }, [contactId])
-
-  useEffect(() => { fetchDraws() }, [fetchDraws])
+    await queryClient.invalidateQueries({ queryKey: jobInvoicesKey(contactId) })
+  }, [contactId, queryClient])
 
   // Paid to date and the PDF's previously paid come from the job detail
   // query, so a payment recorded here refreshes it.
@@ -185,11 +198,11 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           .single()
       }
       if (res.error) throw res.error
-      toastSuccess(payload.id ? 'Draw updated' : 'Draw added', `Draw #${res.data?.sequence_number || ''}`.trim())
+      toastSuccess(payload.id ? 'Draw updated' : 'Draw added', res.data?.sequence_number ? drawNumber(res.data) : '')
       await fetchDraws()
       return true
     } catch (e: any) {
-      toastError("Couldn't save draw", e?.message || 'Try again.')
+      toastError("Couldn't save draw", plainError(e, 'Try again.'))
       return false
     }
   }
@@ -253,7 +266,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       )
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't generate draws", e?.message || 'Try again.')
+      toastError("Couldn't generate draws", plainError(e, 'Try again.'))
       // The write may have reached the server with its answer lost. Read
       // the draws again before Generate is offered, so a retry cannot add
       // a second set.
@@ -287,10 +300,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         .update({ status: 'paid' })
         .eq('id', draw.id)
       if (error) throw error
-      toastSuccess('Marked paid', `Draw #${draw.sequence_number} is covered by payments already logged`)
+      toastSuccess('Marked paid', `${drawNumber(draw)} is covered by payments already logged`)
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't update", e?.message || 'Try again.')
+      toastError("Couldn't update", plainError(e, 'Try again.'))
     } finally {
       setBusyId(null)
     }
@@ -310,10 +323,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         .update({ status: 'void' })
         .eq('id', draw.id)
       if (error) throw error
-      toastSuccess('Draw voided', `Draw #${draw.sequence_number}`)
+      toastSuccess('Draw voided', drawNumber(draw))
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't void", e?.message || 'Try again.')
+      toastError("Couldn't void", plainError(e, 'Try again.'))
     } finally {
       setBusyId(null)
     }
@@ -340,7 +353,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       toastSuccess('Draw deleted', '')
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't delete", e?.message || 'Try again.')
+      toastError("Couldn't delete", plainError(e, 'Try again.'))
     }
   }
 
@@ -355,6 +368,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     license_number: profile?.license_number || '',
     insured_text: profile?.insured_text || ''
   })
+  // Each draw by the number its PDF and customer link print, PCC-2D3E-01,
+  // never a "Draw #1" the customer has never seen (formats-1).
+  const drawNumber = (draw: any) => invoiceReference({ ...draw, contact_id: draw?.contact_id || contact?.id }, companyOf(documentProfile.profile).name)
 
   // What Money asks for on this draw: the job's other draws let money
   // logged against the job count toward the oldest open one. The PDF hero
@@ -450,7 +466,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       downloadPdf(result)
       toastSuccess('Draw PDF downloaded', result.filename)
     } catch (e: any) {
-      toastError("Couldn't generate PDF", e?.message || 'Try again.')
+      toastError("Couldn't generate PDF", plainError(e, 'Try again.'))
     } finally {
       setBusyId(null)
     }
@@ -475,6 +491,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         return
       }
     }
+    // One email of this draw at a time, from any screen.
+    const end = startInvoiceSend(draw.id, { reminder: false })
+    if (!end) return
+    let delivered = false
     setBusyId(draw.id)
     try {
       const to = await drawRecipient()
@@ -486,33 +506,45 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         )
         return
       }
-      const result = await buildDrawPdf(draw, to)
-      if (!result?.doc) throw new Error('PDF generator returned no document')
+      // One send id per send of this draw, kept for every retry until the
+      // email goes out or the draw, its amount due or its recipient
+      // changes. A retry sends the same id and the PDF the first try
+      // uploaded, so the customer gets one email (lib/invoiceSends).
+      const intentKey = sendKey.invoice(draw.id)
+      const intent = sendIntent(intentKey, JSON.stringify([draw.updated_at, recipientEmail, drawAmountDue(draw)]))
+      let result: any = null
+      let file = intent.upload
+      if (!file) {
+        result = await buildDrawPdf(draw, to)
+        if (!result?.doc) throw new Error('PDF generator returned no document')
 
-      // Upload to private job-files bucket so the server can fetch
-      // with service role + attach to the Resend send.
-      const blob = result.doc.output('blob')
-      const rowId = createUuid()
-      const path = `${user.id}/${contact.id}/${rowId}.pdf`
-      const { error: upErr } = await supabase.storage
-        .from('job-files')
-        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the draw PDF: ${upErr.message}`)
+        // Upload to private job-files bucket so the server can fetch
+        // with service role + attach to the Resend send.
+        const blob = result.doc.output('blob')
+        const rowId = createUuid()
+        const path = `${user.id}/${contact.id}/${rowId}.pdf`
+        const { error: upErr } = await supabase.storage
+          .from('job-files')
+          .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+        if (upErr) throw new Error(plainError(upErr, 'The draw PDF could not be saved, so nothing was sent. Try again.'))
+        file = { path, filename: result.filename as string }
+        intent.upload = file
 
-      // Audit row, best-effort, never blocks the send.
-      try {
-        await supabase.from('fh_job_files').insert({
-          id: rowId,
-          user_id: user.id,
-          job_id: contact.id,
-          filename: result.filename,
-          storage_path: path,
-          mime_type: 'application/pdf',
-          size_bytes: blob.size || 0,
-          kind: 'file'
-        })
-      } catch (e: any) {
-        console.warn('[draw] fh_job_files row insert failed', e)
+        // Audit row, best-effort, never blocks the send.
+        try {
+          await supabase.from('fh_job_files').insert({
+            id: rowId,
+            user_id: user.id,
+            job_id: contact.id,
+            filename: result.filename,
+            storage_path: path,
+            mime_type: 'application/pdf',
+            size_bytes: blob.size || 0,
+            kind: 'file'
+          })
+        } catch (e: any) {
+          console.warn('[draw] fh_job_files row insert failed', e)
+        }
       }
 
       const sendRes = await fetch('/api/send-invoice', {
@@ -525,8 +557,9 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           sender_user_id: user.id,
           recipient_email: recipientEmail,
           recipient_name: contact.name || null,
-          storage_path: path,
-          filename: result.filename,
+          storage_path: file.path,
+          filename: file.filename,
+          send_id: intent.id,
           // The same figure the PDF hero printed (drawAmountDue).
           amount_due: drawAmountDue(draw)
         })
@@ -541,14 +574,13 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           'Downloaded the PDF so you can email it manually.'
         )
         const { downloadPdf } = await loadPdf()
-        downloadPdf(result)
+        downloadPdf(result ?? await buildDrawPdf(draw, to))
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-        throw new Error(`Resend rejected${status}: ${detail}`)
+        throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The draw was not sent. Try again.'))
       }
+      endSendIntent(intentKey, intent)
 
       // Flip the draw to 'sent' so the row badge updates immediately.
       // Skip if the draw is already paid (don't downgrade a paid draw
@@ -563,11 +595,13 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
           .eq('id', draw.id))
         if (flipErr) toastError('Draw not marked sent', 'The email went, but the draw status did not update. Refresh and check it.')
       }
-      toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
+      toastSuccess(`Draw sent to ${recipientEmail}`, file.filename)
+      delivered = true
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't send draw", e?.message || 'Try again.')
+      toastError("Couldn't send draw", plainError(e, 'The draw was not sent. Try again.'))
     } finally {
+      end(delivered)
       setBusyId(null)
     }
   }
@@ -579,7 +613,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       <Shell>
         <Header count={draws.length} canAdd={false} />
         <Summary contractTotal={contractTotal} drawsIssued={drawsIssued} previouslyPaid={previouslyPaid} unbilled={unbilled} />
-        <List draws={draws} readOnly />
+        <List draws={draws} drawNumber={drawNumber} readOnly />
       </Shell>
     )
   }
@@ -590,7 +624,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         count={draws.length}
         canAdd={!creating && editingId == null}
         onAdd={() => setCreating(true)}
-        canGenerate={!loading && !loadFailed && liveDraws.length === 0 && contractTotal > 0 && !creating && editingId == null}
+        canGenerate={!loading && !drawsQuery.isFetching && !loadFailed && liveDraws.length === 0 && contractTotal > 0 && !creating && editingId == null}
         onGenerate={handleGenerateFromTerms}
         generating={busyId === '__generate__'}
       />
@@ -626,8 +660,10 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       ) : (
         <List
           draws={draws}
+          drawNumber={drawNumber}
           editingId={editingId}
           busyId={busyId}
+          sendingIds={sendingIds}
           onEdit={(id: any) => setEditingId(id)}
           onCancelEdit={() => setEditingId(null)}
           onSave={async (payload: any) => { const ok = await handleSave(payload); if (ok) setEditingId(null) }}
@@ -761,7 +797,7 @@ function Summary({ contractTotal, drawsIssued, previouslyPaid, unbilled }: any) 
   )
 }
 
-function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
+function List({ draws, drawNumber, editingId, busyId, sendingIds, readOnly, armedKey, onEdit, onCancelEdit, onSave, onMarkPaid, onVoid, onDelete, onDownload, onSend }: any) {
   if (draws.length === 0) {
     return (
       <div style={{
@@ -782,7 +818,8 @@ function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEd
           ) : (
             <Row
               draw={d}
-              busy={busyId === d.id}
+              number={drawNumber(d)}
+              busy={busyId === d.id || !!sendingIds?.has(d.id)}
               readOnly={readOnly}
               onEdit={() => onEdit?.(d.id)}
               onDownload={() => onDownload?.(d)}
@@ -800,7 +837,7 @@ function List({ draws, editingId, busyId, readOnly, armedKey, onEdit, onCancelEd
   )
 }
 
-function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
+function Row({ draw, number, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
   const isPaid = draw.status === 'paid'
   const isVoid = draw.status === 'void'
   const isOverdue = draw.status === 'overdue'
@@ -845,13 +882,13 @@ function Row({ draw, busy, readOnly, onEdit, onDownload, onSend, onMarkPaid, onV
   )
 
   return (
-    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: narrow ? '64px minmax(0, 1fr) auto' : '72px 1fr auto', gap: narrow ? 8 : 12, padding: '12px 16px', alignItems: 'flex-start' }}>
+    <div className="fh-draws-row" style={{ display: 'grid', gridTemplateColumns: narrow ? 'max-content minmax(0, 1fr) auto' : 'max-content 1fr auto', gap: narrow ? 8 : 12, padding: '12px 16px', alignItems: 'flex-start' }}>
       <div style={{
         fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 700,
         letterSpacing: 0, color: 'var(--v3-primary-text)',
-        fontVariantNumeric: 'tabular-nums', paddingTop: 4
+        fontVariantNumeric: 'tabular-nums', paddingTop: 4, whiteSpace: 'nowrap'
       }}>
-        Draw #{draw.sequence_number}
+        {number}
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{

@@ -1232,7 +1232,7 @@ test.describe('money on a desktop', () => {
     const overdue = page.getByRole('region', { name: 'Overdue', exact: true })
     const rosa = overdue.getByRole('row', { name: /Rosa Delgado/ })
     await expect(rosa.getByText('Rosa Delgado', { exact: true })).toBeVisible()
-    await expect(rosa.getByText('Concrete steps, final · Invoice 2 · i-rosa', { exact: true })).toBeVisible()
+    await expect(rosa.getByText('Concrete steps, final · PCC-ROSA-02', { exact: true })).toBeVisible()
     await expect(rosa.getByText('$1,240.00', { exact: true })).toBeVisible()
     await expect(rosa.getByText('6 days overdue', { exact: true })).toBeVisible()
     await expect(rosa.getByRole('link', { name: 'Remind Rosa Delgado' })).toHaveAttribute('href', '/invoices/i-rosa/remind')
@@ -1351,7 +1351,7 @@ test.describe('money on a desktop', () => {
     const soon = page.getByRole('region', { name: 'Due soon', exact: true })
 
     // A click anywhere on the row.
-    await soon.getByRole('cell', { name: 'Roof repair, balance · Invoice 1 · i-gail', exact: true }).click()
+    await soon.getByRole('cell', { name: 'Roof repair, balance · PCC-GAIL-01', exact: true }).click()
     await expect(page).toHaveURL(/\/invoices\/i-gail$/)
     await expect(page.getByRole('dialog')).toHaveCount(0)
     const actions = page.locator('.fhinv-actions')

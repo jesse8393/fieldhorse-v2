@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tabsForStage, resolveTabForStage, stageCta, jobStage } from './stageWorkspace.ts'
+import { tabsForStage, resolveTabForStage, canonicalJobTab, stageCta, jobStage } from './stageWorkspace.ts'
 
 // A job's stage is job, closed or lost (SPEC D55); leads and quotes are
 // records of their own, so the job carries no Quote tab (Phase 9, Task 13).
@@ -44,8 +44,27 @@ describe('resolveTabForStage', () => {
   })
 
   it('falls back to overview when the stage does not expose the requested tab', () => {
-    expect(resolveTabForStage('job', 'quote')).toBe('overview')
+    expect(resolveTabForStage('job', 'estimate')).toBe('overview')
     expect(resolveTabForStage('lost', 'financials')).toBe('overview')
+  })
+
+  // dead-ends-6: change order notifications wrote ?tab=quote and the partner
+  // push ?tab=partners. Links already sent open the section they name.
+  it('opens the section an old notification link names', () => {
+    expect(resolveTabForStage('job', 'quote')).toBe('change_orders')
+    expect(resolveTabForStage('closed', 'quote')).toBe('change_orders')
+    expect(resolveTabForStage('job', 'partners')).toBe('partner')
+    // Still only what the stage has: a closed job has no Partner access.
+    expect(resolveTabForStage('closed', 'partners')).toBe('overview')
+    expect(resolveTabForStage('lost', 'quote')).toBe('overview')
+    expect(resolveTabForStage('job', 'constructor')).toBe('overview')
+  })
+
+  it('names the canonical section for an old id, and leaves others alone', () => {
+    expect(canonicalJobTab('quote')).toBe('change_orders')
+    expect(canonicalJobTab('partners')).toBe('partner')
+    expect(canonicalJobTab('draws')).toBe('draws')
+    expect(canonicalJobTab(null)).toBeNull()
   })
 
   it('falls back to overview for empty/missing requests', () => {

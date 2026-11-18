@@ -33,6 +33,25 @@ export function idempotencyKey(kind, ...parts) {
   return `${kind}/${digest}`
 }
 
+// The send id a screen makes once per send and keeps for every retry of it
+// (src/lib/invoiceSends.ts sendIntent). Only a plain id is taken; anything
+// else reads as none.
+export function sendIdField(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(value) ? value : ''
+}
+
+// The idempotency key for a document email (an invoice, a proposal, a
+// statement, a certificate). With a send id, the key follows the send: a
+// retry of it, with the PDF built and uploaded again or not, is the same
+// key, and the provider drops the repeat, so the customer gets one email
+// however often "Try again" is tapped after an unclear failure. A new send
+// gets a new id and goes out. Without one, an older screen's request is
+// keyed by the attachment path, as before.
+export function documentSendKey(kind, record, { send_id, storage_path } = {}, normalizedEmail = '') {
+  const sendId = sendIdField(send_id)
+  return idempotencyKey(kind, record, sendId ? `send:${sendId}` : storage_path, normalizedEmail)
+}
+
 // POST one email to Resend with an idempotency key and a time limit. Never
 // throws: a network error or a timeout comes back as { ok: false,
 // status: 0 } with a plain detail, so the handler answers JSON instead of
@@ -64,13 +83,13 @@ export async function sendViaResend({ apiKey, payload, key, timeoutMs = PROVIDER
   }
 }
 
-// The handler's error body for a send that did not go out.
-export function sendFailure(result) {
-  return {
-    error: 'send_failed',
-    provider_status: result.status || null,
-    detail: result.detail || result.body?.message || result.body?.error || 'Email provider rejected the send.'
-  }
+// The handler's error body for a send that did not go out. The provider's
+// status and words go to the function log for us; the person reads a plain
+// sentence, since the phone app shows detail as it is.
+export const SEND_FAILED_DETAIL = 'The email did not go out. Try again, or download the PDF and send it yourself.'
+export function sendFailure(result, detail = SEND_FAILED_DETAIL) {
+  console.error('[email] send failed', { status: result.status || null, body: result.body, detail: result.detail || null })
+  return { error: 'send_failed', detail }
 }
 
 // RFC 5322 From header with the display name as a quoted string. Company

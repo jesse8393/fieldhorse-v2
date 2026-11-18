@@ -25,6 +25,7 @@ import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import Field from '../../../components/fh/Field.tsx'
 import { moneyExact } from '../../../lib/format.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const SkeletonAny = SkeletonList as any
 
@@ -115,7 +116,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
       .order('created_at', { ascending: false })
       .limit(100)
     if (error) {
-      toastError("Couldn't load selections", error.message)
+      toastError("Couldn't load selections", plainError(error, 'Try again.'))
       setRows([])
     } else {
       setRows(((data || []) as any[]).map((r) => ({
@@ -142,7 +143,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
     }
     if (clientId) payload.client_id = clientId
     const { error } = await supabase.from('fh_selections').insert(payload)
-    if (error) { toastError("Couldn't create selection", error.message); return }
+    if (error) { toastError("Couldn't create selection", plainError(error, 'Try again.')); return }
     toastSuccess('Selection created')
     setComposing(false)
     load()
@@ -153,7 +154,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
     setRows((rs) => rs.map((r) => r.id === id ? { ...r, ...(patch as any) } : r))
     const { data, error } = await supabase.from('fh_selections').update(patch as any).eq('id', id).select('id').single()
     if (error || !data) {
-      toastError("Couldn't update", error?.message || 'No selection was updated. Try again.')
+      toastError("Couldn't update", plainError(error, 'No selection was updated. Try again.'))
       setRows(before)
       return false
     }
@@ -179,7 +180,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
     hapticTap()
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_selections').delete().eq('id', id)
-    if (error) { toastError("Couldn't delete", error.message); load() }
+    if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); load() }
   }
 
   // Status counts for the small summary chip.
@@ -233,7 +234,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
           border: '1px dashed var(--v3-border)', borderRadius: 10,
         }}>
           <Palette size={18} aria-hidden="true" style={{ display: 'block', margin: '0 auto 8px', color: 'var(--v3-primary-text)' }} />
-          No selections yet. Add one for every finish the client needs to pick, tile, paint, fixtures, hardware.
+          No selections yet. Add one for every finish the client needs to pick: tile, paint, fixtures, hardware.
         </div>
       ) : (
         <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -323,7 +324,7 @@ function SelectionCard({
           {(row.due_at || overdue) && (
             <div style={{ marginTop: 6, fontSize: 12, color: overdue ? 'var(--v3-danger-text)' : 'var(--v3-text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               {overdue && <AlertTriangle size={11} />}
-              Due {fmtDate(row.due_at)} {overdue ? ': overdue' : ''}
+              Due {fmtDate(row.due_at)}{overdue ? ' (overdue)' : ''}
             </div>
           )}
         </div>

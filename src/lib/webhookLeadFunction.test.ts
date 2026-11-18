@@ -80,7 +80,8 @@ import handler, {
   fingerprintWebhookKey,
   getWebhookRateBucketStart,
   getWebhookRateLimitPerMinute,
-  leadIdForIdempotencyKey
+  leadIdForIdempotencyKey,
+  leadNotes
 } from '../../netlify/functions/webhook-lead.js'
 import { sendPushToUser } from '../../netlify/functions/lib/push.js'
 
@@ -386,5 +387,16 @@ describe('webhook-lead treats a repeated delivery as the same lead', () => {
     await expect(waitUntil.mock.calls[0][0]).resolves.toBeUndefined()
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
+  })
+})
+
+// formats-7: the amount a webhook lead carries is saved into its notes as
+// money, "$1,000.50", never "$1,000.5".
+describe('webhook lead notes', () => {
+  it('writes the estimated amount with cents', () => {
+    expect(leadNotes('', 1000.5)).toBe('Estimated amount $1,000.50')
+    expect(leadNotes('', 4500)).toBe('Estimated amount $4,500.00')
+    expect(leadNotes('Call after 5', 127.5)).toBe('Call after 5\nEstimated amount $127.50')
+    expect(leadNotes('', 0)).toBeNull()
   })
 })

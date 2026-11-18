@@ -18,13 +18,15 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useClientDetail } from '../../lib/queries.ts'
 import { companyFromProfile } from '../../lib/invoices.ts'
 import { useDocumentProfile } from '../../lib/companyBranding.ts'
-import { gatherStatement, downloadStatement, sendStatementEmail, fetchStatementMoney } from '../../lib/statement.ts'
+import { gatherStatement, downloadStatement, sendStatementEmail, statementMoneyQuery } from '../../lib/statement.ts'
 import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../../lib/publicLink.ts'
 import { toast, toastSuccess, toastInfo } from '../../lib/toast.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { sendKey, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
 import { recordRoute } from '../../lib/records.ts'
 import './client-statement.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // A statement is a financial document: every figure here must match the
 // PDF and the email to the cent, never a "$12K" abbreviation.
@@ -37,6 +39,10 @@ export default function ClientStatement() {
   const { data: bundle, isPending: loading, isError, refetch } = useClientDetail(id, user?.id)
   const client = bundle?.client ?? null
   const [busy, setBusy] = useState<null | 'download' | 'email' | 'link'>(null)
+  // The email is kept app wide (lib/invoiceSends), not in this screen:
+  // leave the statement while it is still going out and come back, and it
+  // is still busy.
+  const emailOut = useSendInFlight(id ? sendKey.statement(id) : null)
   const titleRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -45,8 +51,7 @@ export default function ClientStatement() {
   // the client bundle does not carry.
   const jobIds = useMemo(() => (bundle?.jobs ?? []).map((j) => j.id), [bundle])
   const moneyQuery = useQuery({
-    queryKey: ['clientStatementMoney', id, jobIds],
-    queryFn: () => fetchStatementMoney(id as string, jobIds),
+    ...statementMoneyQuery(id, jobIds),
     enabled: !!id && !!client
   })
   const data = useMemo(
@@ -80,17 +85,21 @@ export default function ClientStatement() {
       await downloadStatement({ company: await loadCompany(), client, data })
       toastSuccess('Statement downloaded', `${money(data.totalDue)} across ${data.lines.length} invoice${data.lines.length === 1 ? '' : 's'}`)
     } catch (e: any) {
-      toast('Could not generate the statement', { description: e?.message || 'Try again' })
+      toast('Could not generate the statement', { description: plainError(e, 'Try again.') })
     } finally {
       setBusy(null)
     }
   }
 
   async function handleEmail() {
-    if (!data || busy || !client || !user?.id) return
+    if (!data || busy || emailOut || !client || !user?.id) return
+    const end = startSend(sendKey.statement(client.id))
+    if (!end) return
+    let sent = false
     setBusy('email')
     try {
       const res = await sendStatementEmail({ company: await loadCompany(), client, data, userId: user.id, recipientEmail })
+      sent = res.ok
       if (res.ok) {
         toastSuccess(`Statement sent to ${res.recipient}`, `${money(data.totalDue)} due`)
         goBack()
@@ -100,9 +109,10 @@ export default function ClientStatement() {
         toastInfo('Email not set up, downloaded instead', 'The statement PDF was saved to your device.')
         goBack()
       } else {
-        toast("Couldn't send the statement", { description: res.message || 'Try again' })
+        toast("Couldn't send the statement", { description: res.message || 'The statement was not sent. Try again.' })
       }
     } finally {
+      end(sent)
       setBusy(null)
     }
   }
@@ -125,7 +135,7 @@ export default function ClientStatement() {
         toastSuccess('Statement link ready', url)
       }
     } catch (e: any) {
-      toast("Couldn't create the link", { description: e?.message || 'Try again' })
+      toast("Couldn't create the link", { description: plainError(e, 'Try again.') })
     } finally {
       setBusy(null)
     }
@@ -204,7 +214,7 @@ export default function ClientStatement() {
                   variant="primary"
                   size="lg"
                   onClick={handleEmail}
-                  loading={busy === 'email'}
+                  loading={busy === 'email' || emailOut}
                   disabled={!!busy && busy !== 'email'}
                   title={recipientEmail ? `Email to ${recipientEmail}` : 'No client email on file'}
                 >

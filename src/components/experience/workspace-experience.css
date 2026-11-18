@@ -33,7 +33,6 @@
 .fh-quote-result-count { margin: 24px 0 8px; color: var(--fh-ink-2); font-size: 13px; }
 .fh-quote-workspace .fhqt-rows { border-top: 1px solid var(--fh-hairline); }
 .fh-quote-workspace .fhc-row__title { font-weight: 600; }
-.fhc-empty__sub { max-width: 32ch; margin: 8px auto 0; font-size: 14px; line-height: 1.6; color: var(--fh-ink-2); }
 .fh-workspace-checklist { max-width: 1120px; margin: 0 auto 48px; padding: 24px; background: var(--fh-paper); border: 1px solid var(--fh-hairline); border-radius: var(--fh-r-card); color: var(--fh-ink); scroll-margin-top: 24px; }
 .fh-workspace-checklist__heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 24px; }
 .fh-workspace-checklist h2 { font-size: 24px; letter-spacing: var(--fh-tracking-title); line-height: 1.2; margin: 0; font-weight: 600; }

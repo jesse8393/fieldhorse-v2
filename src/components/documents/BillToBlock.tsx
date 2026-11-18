@@ -10,6 +10,7 @@
 // is provided.
 
 import { DOC_COLORS, typeStyle } from './tokens.ts'
+import { formatPhone } from '../../lib/utils.ts'
 
 /**
  * @param {object} props
@@ -85,7 +86,7 @@ function Panel({ label, children }: { label?: import('react').ReactNode; childre
 }
 
 function ContactLines({ client }: { client?: any }) {
-  const lines = [client?.phone, client?.email].map((s) => (s && String(s).trim()) || '').filter(Boolean)
+  const lines = [formatPhone(client?.phone), client?.email].map((s) => (s && String(s).trim()) || '').filter(Boolean)
   if (!lines.length) return null
   return (
     <div style={{ ...typeStyle('sub'), color: DOC_COLORS.inkMuted, marginTop: 6 }}>

@@ -95,7 +95,7 @@ describe('a site set up with only the newer key names', () => {
     expect(await link.json()).toEqual({ error: 'server_misconfigured' })
     const invite = await invitePartner(new Request('https://app.example.test/api/partner-invite', { method: 'POST', body: '{}' }))
     expect(invite.status).toBe(500)
-    expect(await invite.json()).toEqual({ error: 'server_misconfigured', detail: 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in Netlify env.' })
+    expect(await invite.json()).toEqual({ error: 'server_misconfigured', detail: 'Email invites are not available right now. Try again later.' })
     expect(clients.calls).toEqual([])
   })
 })

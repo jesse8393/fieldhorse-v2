@@ -7,7 +7,7 @@
 //
 // Browser hits POST /api/send-statement with:
 //   { client_id, sender_user_id, recipient_email, recipient_name?,
-//     storage_path, filename, total_due? }
+//     storage_path, filename, total_due?, send_id? }
 //
 // White-label sender policy matches send-invoice / send-message:
 //   From:     `${Company Name} <notifications@fieldhorse.io>`
@@ -15,10 +15,11 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { supabaseServiceConfig } from './lib/serviceConfig.js'
-import { renderPayBlock, formatFromHeader, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
+import { renderPayBlock, formatFromHeader, textField, documentSendKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
+import { moneyCents } from './lib/money.js'
 
 export default async (request) => {
   if (request.method === 'OPTIONS') {
@@ -34,7 +35,7 @@ export default async (request) => {
   const SEND_EMAIL_FROM_NAME = process.env.SEND_EMAIL_FROM_NAME || 'Notifications'
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    return json({ error: 'server_misconfigured', message: 'Server is missing Supabase credentials.' }, 500)
+    return json({ error: 'server_misconfigured', message: 'Email sending is not available right now. Try again later.' }, 500)
   }
   if (!RESEND_API_KEY || !SEND_EMAIL_FROM) {
     return json({ error: 'sender_not_configured', message: 'Email sender is not configured yet.' }, 503)
@@ -184,7 +185,7 @@ export default async (request) => {
   const sent = await sendViaResend({
     apiKey: RESEND_API_KEY,
     payload: resendPayload,
-    key: idempotencyKey('send-statement', `client:${client_id}`, storage_path, normalizedEmail)
+    key: documentSendKey('send-statement', `client:${client_id}`, payload || {}, normalizedEmail)
   })
   if (!sent.ok) return json(sendFailure(sent), 502)
 
@@ -194,10 +195,9 @@ export default async (request) => {
 function formatMoneyLabel(n) {
   const v = Number(n || 0)
   if (!Number.isFinite(v) || v <= 0) return ''
-  // Cents shown when present so the emailed figure matches the PDF's
-  // cent-precise total (see send-invoice.js formatMoneyLabel).
-  const hasCents = Math.abs(v - Math.round(v)) >= 0.005
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 })}`
+  // Dollars and cents, so the emailed figure matches the PDF's total
+  // (see send-invoice.js formatMoneyLabel).
+  return moneyCents(v)
 }
 
 function renderStatementHtml({ greeting, clientLabel, amountLabel, senderLine, payLink, payInstructions }) {

@@ -632,7 +632,7 @@ async function fetchActivity(userId: string, pageSize: number, orgId?: string | 
       .select('id, contact_id, sequence_number, title, amount, status, approved_at, created_at, user_id'), userId, orgId)
       .order('created_at', { ascending: false }).limit(pageSize),
     scoped(supabase.from('fh_invoices')
-      .select('id, contact_id, sequence_number, title, amount, status, issued_at, created_at, user_id'), userId, orgId)
+      .select('id, contact_id, client_id, sequence_number, title, amount, status, issued_at, created_at, user_id'), userId, orgId)
       .order('created_at', { ascending: false }).limit(pageSize)
   ])
   for (const result of [transitions, payments, changeOrders, invoices]) {
@@ -1147,7 +1147,7 @@ async function fetchClientDetail(id: string, userId: string, orgId?: string | nu
       .order('updated_at', { ascending: false }),
     scoped(supabase
       .from('fh_invoices')
-      .select('id, contact_id, title, amount, status, due_at, sequence_number, updated_at, created_at'), userId, orgId)
+      .select('id, contact_id, title, amount, status, due_at, sequence_number, issued_at, updated_at, created_at'), userId, orgId)
       .eq('client_id', client.id)
       .order('updated_at', { ascending: false })
   ])
@@ -1371,16 +1371,21 @@ export type InvoiceDetailBundle = {
   changeOrders: Database['public']['Tables']['fh_change_orders']['Row'][]
 }
 
-async function fetchInvoiceDetail(id: string): Promise<InvoiceDetailBundle> {
+const NO_ROWS = Promise.resolve({ data: null, error: null })
+
+// withMoney false reads only the contact: the job screen already read its
+// payments, claim and change orders and hands them over (vibe audit
+// console-2), and the bundle leaves them empty.
+async function fetchInvoiceDetail(id: string, withMoney: boolean): Promise<InvoiceDetailBundle> {
   const [cRes, psRes, insRes, coRes] = await Promise.all([
     supabase
       .from('fh_contacts')
       .select('*, fh_clients!fh_contacts_client_id_fkey(name, email, phone, address)')
       .eq('id', id)
       .maybeSingle(),
-    supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }),
-    supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle(),
-    supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true })
+    withMoney ? supabase.from('fh_payments').select('*').eq('contact_id', id).order('paid_on', { ascending: false }) : NO_ROWS,
+    withMoney ? supabase.from('fh_insurance_claims').select('*').eq('contact_id', id).maybeSingle() : NO_ROWS,
+    withMoney ? supabase.from('fh_change_orders').select('*').eq('contact_id', id).order('sequence_number', { ascending: true }) : NO_ROWS
   ])
   if (cRes.error) throw cRes.error
   if (psRes.error) throw psRes.error
@@ -1395,10 +1400,10 @@ async function fetchInvoiceDetail(id: string): Promise<InvoiceDetailBundle> {
   }
 }
 
-export function useInvoiceDetail(id: string | undefined, userId: string | undefined) {
+export function useInvoiceDetail(id: string | undefined, userId: string | undefined, { withMoney = true }: { withMoney?: boolean } = {}) {
   return useQuery({
-    queryKey: ['invoiceDetail', id],
-    queryFn: () => fetchInvoiceDetail(id as string),
+    queryKey: withMoney ? ['invoiceDetail', id] : ['invoiceDetail', id, 'contact'],
+    queryFn: () => fetchInvoiceDetail(id as string, withMoney),
     enabled: !!id && !!userId
   })
 }

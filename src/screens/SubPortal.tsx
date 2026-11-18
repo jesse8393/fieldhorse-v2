@@ -19,10 +19,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell, MapPin, Search, ChevronRight, ShieldCheck, Briefcase,
-  AlertTriangle, Mail, Edit2, Upload, Check, X, FileText,
+  AlertTriangle, Mail, Edit2, Upload, Check, X, FileText, LogOut,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
+import { useNavAccess } from '../lib/useNavAccess.ts'
 import {
   mergedProfile, subPortalContext, subUploadDoc, subDocSignedUrl,
   type SubPortalContext, type DocKind,
@@ -33,6 +34,7 @@ import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // Toast words for each document kind; acronyms stay in capitals.
 const DOC_KIND_LABEL: Record<DocKind, string> = { coi: 'COI', w9: 'W9', license: 'License' }
@@ -82,8 +84,13 @@ function insuranceStatus(iso: string | null): { label: string; tone: 'good' | 'w
 
 export default function SubPortal() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const { loading: memLoading, orgId } = useMembership()
+  // Without a company role the sub portal is the only screen this person
+  // can open (dead-ends-2): no search, activity or job links that bounce
+  // straight back here.
+  const { canSee } = useNavAccess()
+  const canOpenJobs = canSee('/jobs')
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -98,15 +105,12 @@ export default function SubPortal() {
       const res = await subPortalContext()
       setCtx(res)
     } catch (e: any) {
-      const raw = e?.detail || e?.message || ''
-      // Raw server codes ("http_404") read as gibberish. A 404 here just
-      // means no partner records exist for this account yet.
+      // A 404 here just means no partner records exist for this account
+      // yet; anything else is worded by plainError.
       setError(
-        /^http_404$/i.test(raw)
+        Number(e?.status) === 404
           ? 'No partner records yet. When a contractor adds you to a job, it shows up here.'
-          : /^http_\d+$/i.test(raw)
-            ? 'Could not load portal data. Check your connection and retry.'
-            : raw || 'Could not load portal data.'
+          : plainError(e, 'Could not load portal data. Check your connection and retry.')
       )
     } finally {
       setLoading(false)
@@ -141,7 +145,7 @@ export default function SubPortal() {
       toastSuccess(`${DOC_KIND_LABEL[kind]} uploaded`)
       await load()
     } catch (e: any) {
-      toastError('Upload failed', e?.detail || e?.message || '')
+      toastError('Upload failed', plainError(e, 'Try again.'))
     } finally {
       setUploading(null)
     }
@@ -152,31 +156,35 @@ export default function SubPortal() {
   return (
     <div className="fh-build-page" data-build-screen="SubPortal" data-build-route="/sub-portal">
       <header className="fh-build-topbar fh-build-topbar--no-cta">
-        <button
-          type="button"
-          className="fh-build-search"
-          onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
-          aria-label="Open command palette"
-          aria-keyshortcuts={paletteShortcut().combo}
-        >
-          <Search size={14} />
-          <span>Search…</span>
-          <PaletteKeyCap />
-        </button>
+        {canSee('/search') && (
+          <button
+            type="button"
+            className="fh-build-search"
+            onClick={() => window.dispatchEvent(new CustomEvent('fh:open-palette'))}
+            aria-label="Open command palette"
+            aria-keyshortcuts={paletteShortcut().combo}
+          >
+            <Search size={14} />
+            <span>Search…</span>
+            <PaletteKeyCap />
+          </button>
+        )}
         <div className="fh-build-topbar__meta">
           <span>{user?.email || 'Sub portal'}</span>
           <span className="fh-build-vline" />
           <span style={{ opacity: 0.6 }}>Partner workspace</span>
         </div>
-        <button
-          className="fh-build-icon-btn"
-          type="button"
-          onClick={() => navigate('/activity')}
-          aria-label="Open activity"
-          title="Activity"
-        >
-          <Bell size={16} />
-        </button>
+        {canSee('/activity') && (
+          <button
+            className="fh-build-icon-btn"
+            type="button"
+            onClick={() => navigate('/activity')}
+            aria-label="Open activity"
+            title="Activity"
+          >
+            <Bell size={16} />
+          </button>
+        )}
       </header>
 
       <div className="fh-build-main">
@@ -196,6 +204,19 @@ export default function SubPortal() {
                 ? 'You also belong to a company. Open Today or Jobs from the menu for its work.'
                 : 'Manage your insurance, W9, and payments across every contractor that has you on file.'}
             </p>
+            {/* The workspace menu, which holds Sign out, is not open to a
+                person with no company role, so Sign out lives here too. */}
+            <button
+              type="button"
+              className="fh-build-secondary-btn"
+              onClick={async () => {
+                await signOut()
+                navigate('/login', { replace: true })
+              }}
+            >
+              <LogOut size={12} aria-hidden="true" style={{ marginRight: 4 }} />
+              Sign out
+            </button>
           </div>
 
           <div className="fh-build-mini-grid">
@@ -329,13 +350,8 @@ export default function SubPortal() {
                     </div>
                     {partners.map((p) => {
                       const j = jobs[p.job_id]
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          className="fh-build-table__row is-subportal"
-                          onClick={() => navigate(`/jobs/${p.job_id}`)}
-                        >
+                      const cells = (
+                        <>
                           <strong className="fh-build-truncate" title={j?.name || ''}>{j?.name || 'Untitled job'}</strong>
                           <span className="fh-build-truncate fh-build-rel" title={j?.address || ''}>
                             {j?.address ? <><MapPin size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />{j.address}</> : '\u2003'}
@@ -349,8 +365,25 @@ export default function SubPortal() {
                             </span>
                           </span>
                           <span className="fh-build-rel">{fmtDate(p.accepted_at)}</span>
+                        </>
+                      )
+                      // The job is the contractor's. Someone with a company
+                      // role opens it; anyone else reads the row as it is.
+                      return canOpenJobs ? (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="fh-build-table__row is-subportal"
+                          onClick={() => navigate(`/jobs/${p.job_id}`)}
+                        >
+                          {cells}
                           <ChevronRight size={13} color="var(--v3-text-faint)" />
                         </button>
+                      ) : (
+                        <div key={p.id} className="fh-build-table__row is-subportal" style={{ cursor: 'default' }}>
+                          {cells}
+                          <span />
+                        </div>
                       )
                     })}
                   </>

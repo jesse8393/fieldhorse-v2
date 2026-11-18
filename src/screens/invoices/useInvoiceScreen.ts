@@ -35,6 +35,7 @@ import { useNow } from '../../lib/useNow.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // How long after an email lands a tap on its button is taken as aimed at the busy button.
 const SETTLE_MS = 800
@@ -122,8 +123,10 @@ export function useInvoiceScreen(id: string | undefined) {
   const billingReview = useMemo(() => record ? reviewInvoice({ invoice: record.invoice, invoices: record.jobInvoices, contractTotal: record.job ? knownContractTotal({ amount: record.job.amount, changeOrders: record.changeOrders }) : null }) : null, [record])
   // The company block of the invoice's own company, read again for each
   // document so it is current, whoever builds it (DATA-06).
-  const { load: loadDocumentProfile } = useDocumentProfile(record?.invoice.org_id)
+  const { profile: documentProfileNow, load: loadDocumentProfile } = useDocumentProfile(record?.invoice.org_id)
   const loadCompany = useCallback(async () => companyFromProfile(await loadDocumentProfile()), [loadDocumentProfile])
+  // The name the invoice's number is built from, as on its PDF (formats-1).
+  const companyName = companyFromProfile(documentProfileNow).name
   const sending = !!id && sendingIds.has(id)
 
   const refresh = useCallback(() => invalidate(id), [invalidate, id])
@@ -202,12 +205,12 @@ export function useInvoiceScreen(id: string | undefined) {
         throw new Error(res.message || 'Send failed')
       }
     } catch (e) {
-      toastError("Couldn't send invoice", (e as Error)?.message || 'Try again')
+      toastError("Couldn't send invoice", plainError(e, 'The invoice was not sent. Try again.'))
     } finally {
       finish(sent)
     }
     return sent
   }, [record, user, loadCompany, refresh, queryClient, id, now])
 
-  return { user, query, record, figures, billingReview, loadCompany, now, sending, refresh, patchInvoice, send }
+  return { user, query, record, figures, billingReview, loadCompany, companyName, now, sending, refresh, patchInvoice, send }
 }

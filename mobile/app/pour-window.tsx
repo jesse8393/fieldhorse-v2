@@ -185,8 +185,8 @@ export default function PourWindowScreen() {
                           <Text style={{ color: theme.inkMuted, fontSize: 12 }}>{fmtDate(d.time)}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 5 }}>
-                          <Text style={{ color: theme.inkMuted, fontSize: 12 }}>💧 {Math.round(d.rainPct)}%</Text>
-                          <Text style={{ color: theme.inkMuted, fontSize: 12 }}>💨 {Math.round(d.windMax)} mph</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Droplets color={theme.inkMuted} size={12} /><Text style={{ color: theme.inkMuted, fontSize: 12 }}>{Math.round(d.rainPct)}%</Text></View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Wind color={theme.inkMuted} size={12} /><Text style={{ color: theme.inkMuted, fontSize: 12 }}>{Math.round(d.windMax)} mph</Text></View>
                           <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, backgroundColor: t.bg, borderWidth: 1, borderColor: t.border }}>
                             <Text style={{ color: t.fg, fontSize: 12, fontWeight: '800', letterSpacing: 0 }}>{ds === 'go' ? 'GO' : ds === 'warn' ? 'TIGHT' : 'STOP'}</Text>
                           </View>

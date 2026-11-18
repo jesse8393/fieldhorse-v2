@@ -167,7 +167,7 @@ export default function ScheduleScreen() {
               </Card>
             </Pressable>
           )}
-          ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>A clear stretch, nothing scheduled.</Text>}
+          ListEmptyComponent={<Text style={{ color: theme.inkMuted, textAlign: 'center', marginTop: 48 }}>A clear stretch. Nothing scheduled.</Text>}
           ListFooterComponent={events.length ? <Text style={{ color: theme.inkMuted, fontSize: 12, textAlign: 'center', marginTop: 16 }}>Tap an event to edit or delete.</Text> : null}
         />
       )}

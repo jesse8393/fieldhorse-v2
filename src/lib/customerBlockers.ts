@@ -18,7 +18,7 @@ export function clientBillingBundle(clientId: string, detail: Pick<ClientDetailB
     changeOrders: detail.changeOrders as unknown as InvoicesBundle['changeOrders'],
   }
 }
-export function customerBlockers({ clientId, jobs, schedules, billing, now }: { clientId: string; jobs: { id: string; stage?: string | null; job_title?: string | null; name?: string | null }[]; schedules: { id: string; contact_id: string | null; end_at: string | null }[]; billing?: InvoicesBundle | null; now: Date }): CustomerBlocker[] {
+export function customerBlockers({ clientId, jobs, schedules, billing, now, companyName }: { clientId: string; jobs: { id: string; stage?: string | null; job_title?: string | null; name?: string | null }[]; schedules: { id: string; contact_id: string | null; end_at: string | null }[]; billing?: InvoicesBundle | null; now: Date; companyName?: string | null }): CustomerBlocker[] {
   const result: CustomerBlocker[] = []
   const since = now.getTime() - 14 * 86400000
   for (const job of jobs) {
@@ -29,7 +29,7 @@ export function customerBlockers({ clientId, jobs, schedules, billing, now }: { 
   }
   if (billing) {
     const ids = new Set(jobs.map(j => j.id))
-    const overdue = buildMoneyReconciliation(billing, [], now).find(g => g.id === 'overdue')!
+    const overdue = buildMoneyReconciliation(billing, [], now, companyName).find(g => g.id === 'overdue')!
     for (const row of overdue.rows) {
       const invoice = billing.invoices.find(i => i.id === row.id) ?? billing.openInvoices?.find(i => i.id === row.id)
       if (!invoice || !(invoice.client_id === clientId || invoice.contact_id && ids.has(invoice.contact_id))) continue

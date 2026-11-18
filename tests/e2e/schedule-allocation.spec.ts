@@ -146,6 +146,36 @@ test('a missing crew column hides the crew picker without a warning and the visi
   expect(written[0]).not.toHaveProperty('assigned_user_ids')
 })
 
+// Production lacks the crew column until its migration is applied. Each
+// date or time change asked again and logged a 400 (vibe audit console-3).
+test('a missing crew column is asked about once while a visit is set up', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_schedule: [] } })
+  await context.route('**/api/org-members-list', (route) => route.fulfill({ json: { ok: true, org_id: 'org-1', members: roster, invites: [] } }))
+  let asked = 0
+  await context.route('**/rest/v1/fh_schedule*', async (route) => {
+    if (!isAvailabilityRead(route.request().url())) return route.fallback()
+    asked += 1
+    return route.fulfill({ status: 400, json: { message: 'column fh_schedule.assigned_user_ids does not exist', code: '42703' } })
+  })
+  const failures: string[] = []
+  page.on('console', (message) => { if (message.type() === 'error' && /status of 400/.test(message.text())) failures.push(message.text()) })
+  const availabilityRead = page.waitForResponse((response) => isAvailabilityRead(response.url()))
+  await page.goto('/schedule/new')
+  await page.getByLabel('Title', { exact: true }).fill('Unassigned inspection')
+  await availabilityRead
+  for (const day of ['2026-12-01', '2026-12-02', '2026-12-03']) {
+    await page.getByLabel('Date', { exact: true }).fill(day)
+    await page.waitForTimeout(600)
+  }
+  for (const time of ['08:00', '09:30']) {
+    await page.getByLabel('Time', { exact: true }).fill(time)
+    await page.waitForTimeout(600)
+  }
+  await expect(page.getByRole('region', { name: 'Crew allocation' })).toHaveCount(0)
+  expect(asked).toBe(1)
+  expect(failures.length).toBeLessThanOrEqual(1)
+})
+
 test('a failed availability read for a team still says so and permits an unassigned visit', async ({ context, page }) => {
   await signIn(context, { tables: { fh_schedule: [] } })
   await context.route('**/api/org-members-list', (route) => route.fulfill({ json: { ok: true, org_id: 'org-1', members: roster, invites: [] } }))

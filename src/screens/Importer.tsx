@@ -13,7 +13,7 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { Eyebrow } from '../components/v3'
-import { countNoun } from '../lib/format.ts'
+import { countNoun, moneyCents } from '../lib/format.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import MiniMetric from '../components/MiniMetric.tsx'
@@ -26,6 +26,7 @@ import {
   type HeaderMap, type ImportField, type ImportRecord
 } from '../lib/importMapping.ts'
 import { runImport } from '../lib/importRun.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 export default function Importer() {
   const isDesktop = useIsDesktop()
@@ -226,7 +227,7 @@ export default function Importer() {
         `${mappedCount} of ${TARGET_FIELDS.length} ${countNoun(TARGET_FIELDS.length, 'field')} matched`
       )
     } catch (e: any) {
-      toastError("Couldn't map automatically", e?.message || 'Try the manual mapping below.')
+      toastError("Couldn't map automatically", plainError(e, 'Try the manual mapping below.'))
     } finally {
       setAiMapping(false)
     }
@@ -266,8 +267,8 @@ export default function Importer() {
       // read like the haptic was conditional on the whole line. Split
       // for symmetry with the success path.
       const msg = landed > 0
-        ? `Imported ${landed} of ${payload.length}. The rest did not import: ${error.message}`
-        : error.message
+        ? `Imported ${landed} of ${payload.length}. The rest did not import. ${plainError(error, 'Try again.')}`
+        : plainError(error, 'Nothing was imported. Try again.')
       // The rows that landed now read as repeats; skip them on a retry.
       setIncludeRepeats(false)
       setDone({ err: msg })
@@ -534,7 +535,7 @@ export default function Importer() {
                     </div>
                   </div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, letterSpacing: 0, color: 'var(--field-gold-bright)' }}>
-                    {m.amount ? `$${m.amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : ''}
+                    {m.amount ? moneyCents(m.amount) : ''}
                   </div>
                 </div>
               ))}

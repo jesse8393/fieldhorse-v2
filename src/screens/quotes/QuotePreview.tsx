@@ -22,6 +22,7 @@ import { useQuote } from './useQuote.ts'
 import { quoteAsContact, type QuoteWithClient } from './quoteShape.ts'
 import { buildQuotePdf, companyFromProfile, downloadQuotePdf, legacyContactId, NoLinesError } from './quoteDocument.ts'
 import './quotes.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 export default function QuotePreview() {
   const { id = '' } = useParams()
@@ -86,7 +87,7 @@ function Preview({ quote, home }: { quote: QuoteWithClient; home: string }) {
       await downloadQuotePdf(result)
       toastSuccess('Quote downloaded', result.filename)
     } catch (e) {
-      toastError("Couldn't download", e instanceof NoLinesError ? e.message : (e as Error)?.message || 'Try again')
+      toastError("Couldn't download", e instanceof NoLinesError ? e.message : plainError(e, 'The PDF could not be made. Try again.'))
     } finally {
       setDownloading(false)
     }

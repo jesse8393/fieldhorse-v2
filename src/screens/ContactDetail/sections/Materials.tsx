@@ -28,6 +28,7 @@ import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import { moneyExact } from '../../../lib/format.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const SkeletonAny = SkeletonList as any
 
@@ -113,6 +114,17 @@ export default function MaterialsSection({ jobId, userId }: any) {
   const bulkButtonRef = useRef<HTMLButtonElement>(null)
   const notesButtonRef = useRef<HTMLButtonElement>(null)
   const [draft, setDraft] = useState({ name: '', qty: '1', unit: 'EA', supplier: '', unit_cost: '' })
+  // One add at a time. A second tap while a write is still out did the
+  // write again, so a double tap made two lines. The ref is read at once;
+  // the state shows the Add buttons as working until the write settles.
+  const [adding, setAdding] = useState(false)
+  const addingRef = useRef(false)
+  async function addOnce(write: () => Promise<void>) {
+    if (addingRef.current) return
+    addingRef.current = true
+    setAdding(true)
+    try { await write() } finally { addingRef.current = false; setAdding(false) }
+  }
 
   function closeBulk() { setBulkOpen(false); bulkButtonRef.current?.focus() }
   function closeNotes() { setNotesPromptOpen(false); notesButtonRef.current?.focus() }
@@ -127,7 +139,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
       .order('created_at', { ascending: false })
       .limit(500)
     if (error) {
-      toastError("Couldn't load materials", error.message)
+      toastError("Couldn't load materials", plainError(error, 'Try again.'))
       setRows([])
     } else {
       setRows(((data || []) as any[]) as MaterialRow[])
@@ -143,20 +155,22 @@ export default function MaterialsSection({ jobId, userId }: any) {
     const qty = Number(draft.qty || '1') || 1
     const unit_cost = draft.unit_cost === '' ? null : Number(draft.unit_cost)
     const supplier = draft.supplier.trim() || null
-    hapticTap()
-    const { error } = await supabase.from('fh_materials').insert({
-      user_id: userId,
-      contact_id: jobId,
-      name,
-      qty_needed: qty,
-      unit: draft.unit || 'EA',
-      supplier,
-      unit_cost,
-    } as any)
-    if (error) { toastError("Couldn't add", error.message); return }
-    setDraft({ name: '', qty: '1', unit: 'EA', supplier: '', unit_cost: '' })
-    toastSuccess('Added')
-    load()
+    await addOnce(async () => {
+      hapticTap()
+      const { error } = await supabase.from('fh_materials').insert({
+        user_id: userId,
+        contact_id: jobId,
+        name,
+        qty_needed: qty,
+        unit: draft.unit || 'EA',
+        supplier,
+        unit_cost,
+      } as any)
+      if (error) { toastError("Couldn't add", plainError(error, 'Try again.')); return }
+      setDraft({ name: '', qty: '1', unit: 'EA', supplier: '', unit_cost: '' })
+      toastSuccess('Added')
+      load()
+    })
   }
 
   async function bulkAdd(lines: string[]) {
@@ -171,18 +185,20 @@ export default function MaterialsSection({ jobId, userId }: any) {
       qty_needed: p.qty,
       unit: 'EA',
     }))
-    const { error } = await supabase.from('fh_materials').insert(payload as any)
-    if (error) { toastError("Couldn't bulk add", error.message); return }
-    toastSuccess(`Added ${parsed.length} item${parsed.length === 1 ? '' : 's'}`)
-    closeBulk()
-    load()
+    await addOnce(async () => {
+      const { error } = await supabase.from('fh_materials').insert(payload as any)
+      if (error) { toastError("Couldn't bulk add", plainError(error, 'Try again.')); return }
+      toastSuccess(`Added ${parsed.length} item${parsed.length === 1 ? '' : 's'}`)
+      closeBulk()
+      load()
+    })
   }
 
   async function patch(id: string, p: Partial<MaterialRow>) {
     const before = rows
     setRows((rs) => rs.map((r) => r.id === id ? { ...r, ...(p as any) } : r))
     const { error } = await supabase.from('fh_materials').update(p as any).eq('id', id)
-    if (error) { toastError("Couldn't update", error.message); setRows(before) }
+    if (error) { toastError("Couldn't update", plainError(error, 'Try again.')); setRows(before) }
   }
 
   async function markOrdered(id: string) {
@@ -217,7 +233,7 @@ export default function MaterialsSection({ jobId, userId }: any) {
       hapticTap()
       setRows((rs) => rs.filter((r) => r.id !== id))
       void supabase.from('fh_materials').delete().eq('id', id).then(({ error }) => {
-        if (error) { toastError("Couldn't delete", error.message); load() }
+        if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); load() }
       })
     })
   }
@@ -305,10 +321,11 @@ export default function MaterialsSection({ jobId, userId }: any) {
           type="button"
           onClick={addOne}
           aria-label="Add material"
-          disabled={!draft.name.trim()}
-          style={primaryBtn(!draft.name.trim())}
+          aria-busy={adding || undefined}
+          disabled={!draft.name.trim() || adding}
+          style={primaryBtn(!draft.name.trim() || adding)}
         >
-          <Plus size={12} aria-hidden="true" /> Add
+          <Plus size={12} aria-hidden="true" /> {adding ? 'Adding…' : 'Add'}
         </button>
       </div>
 
@@ -344,13 +361,14 @@ export default function MaterialsSection({ jobId, userId }: any) {
       )}
 
       {bulkOpen && (
-        <BulkAddDialog onClose={closeBulk} onAdd={bulkAdd} />
+        <BulkAddDialog onClose={closeBulk} onAdd={bulkAdd} adding={adding} />
       )}
       {notesPromptOpen && (
         <NotesPullDialog
           jobId={jobId}
           onClose={closeNotes}
-          onAdd={async (items) => {
+          adding={adding}
+          onAdd={(items) => addOnce(async () => {
             const payload = items.map((it) => ({
               user_id: userId,
               contact_id: jobId,
@@ -360,9 +378,9 @@ export default function MaterialsSection({ jobId, userId }: any) {
               source: { from: 'note', note_id: it.note_id },
             }))
             const { error } = await supabase.from('fh_materials').insert(payload as any)
-            if (error) toastError("Couldn't add", error.message)
+            if (error) toastError("Couldn't add", plainError(error, 'Try again.'))
             else { toastSuccess(`Added ${items.length}`); closeNotes(); load() }
-          }}
+          })}
         />
       )}
     </div>
@@ -478,7 +496,7 @@ function MaterialCard({
 
 // ─── bulk add ──────────────────────────────────────────────────────
 
-function BulkAddDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (lines: string[]) => void }) {
+function BulkAddDialog({ onClose, onAdd, adding }: { onClose: () => void; onAdd: (lines: string[]) => void; adding: boolean }) {
   const [text, setText] = useState('')
   const preview = useMemo(
     () => text.split(/\r?\n/).map(parseBulkLine).filter((x): x is { qty: number; name: string } => !!x && x.name.length > 0),
@@ -500,8 +518,8 @@ function BulkAddDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (lines:
       </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
         <button type="button" onClick={onClose} style={secondaryBtn}>Cancel</button>
-        <button type="button" onClick={() => onAdd(text.split(/\r?\n/))} disabled={preview.length === 0} style={primaryBtn(preview.length === 0)}>
-          Add {preview.length}
+        <button type="button" onClick={() => onAdd(text.split(/\r?\n/))} disabled={preview.length === 0 || adding} aria-busy={adding || undefined} style={primaryBtn(preview.length === 0 || adding)}>
+          {adding ? 'Adding…' : `Add ${preview.length}`}
         </button>
       </div>
     </DialogShell>
@@ -510,10 +528,11 @@ function BulkAddDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (lines:
 
 // ─── pull-from-notes ───────────────────────────────────────────────
 
-function NotesPullDialog({ jobId, onClose, onAdd }: {
+function NotesPullDialog({ jobId, onClose, onAdd, adding }: {
   jobId: string
   onClose: () => void
   onAdd: (items: { name: string; qty: number; note_id: string }[]) => Promise<void>
+  adding: boolean
 }) {
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<{ name: string; qty: number; note_id: string; checked: boolean }[]>([])
@@ -595,8 +614,8 @@ function NotesPullDialog({ jobId, onClose, onAdd }: {
       )}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
         <button type="button" onClick={onClose} style={secondaryBtn}>Cancel</button>
-        <button type="button" onClick={() => onAdd(chosen.map((c) => ({ name: c.name, qty: c.qty, note_id: c.note_id })))} disabled={chosen.length === 0} style={primaryBtn(chosen.length === 0)}>
-          Add {chosen.length}
+        <button type="button" onClick={() => onAdd(chosen.map((c) => ({ name: c.name, qty: c.qty, note_id: c.note_id })))} disabled={chosen.length === 0 || adding} aria-busy={adding || undefined} style={primaryBtn(chosen.length === 0 || adding)}>
+          {adding ? 'Adding…' : `Add ${chosen.length}`}
         </button>
       </div>
     </DialogShell>

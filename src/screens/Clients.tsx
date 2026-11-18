@@ -20,14 +20,10 @@ import { Button } from '../components/fh'
 const SnowClients = lazy(() => import('../components/desktop/SnowClientsBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
+import { moneyCents } from '../lib/format.ts'
 
-function money(n: any) {
-  const v = Number(n || 0)
-  if (!v) return '$0'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
+// A customer's money to the cent, never "$12K" (formats-4).
+const money = moneyCents
 
 const validWindow = (value: unknown): value is number => Number.isInteger(value) && Number(value) >= 40 && Number(value) <= 100_000
 

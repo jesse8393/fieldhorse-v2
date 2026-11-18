@@ -78,6 +78,11 @@ describe('closeout reads are scoped by the job, not the caller', () => {
     expect(filtersOn('fh_closeouts')).toEqual(['contact_id'])
   })
 
+  it('loadCloseout throws when the read fails, so it is not taken for no closeout', async () => {
+    results.fh_closeouts = { data: null, error: { message: 'upstream timeout' } }
+    await expect(loadCloseout({ userId: 'admin-1', contactId: 'job-1' })).rejects.toMatchObject({ message: 'upstream timeout' })
+  })
+
   it('clearCloseout deletes by job only', async () => {
     await clearCloseout({ userId: 'admin-1', contact: { id: 'job-1', user_id: 'owner-1', stage: 'job' } as any })
     expect(filtersOn('fh_closeouts')).toEqual(['contact_id'])

@@ -19,9 +19,13 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { SkeletonList } from '../../../components/Skeleton.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
-import { todayYmd } from '../../../lib/dates.ts'
+import { todayYmd, timeOfDay } from '../../../lib/dates.ts'
 import { Eyebrow } from '../../../components/v3'
 import Field from '../../../components/fh/Field.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
+import DraftRestored from '../../../components/DraftRestored.tsx'
+import { useEditDraft } from '../../../lib/useEditDraft.ts'
+import { clearDraft as forgetStoredDraft, draftWaiting, readDraftEntry } from '../../../lib/drafts.ts'
 
 const SkeletonAny = SkeletonList as any
 const PHOTO_BUCKET = 'job-photos'
@@ -66,11 +70,40 @@ function fmtDay(iso: string): string {
 
 function fmtTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return timeOfDay(iso)
   } catch { return '' }
 }
 
 type DraftPhoto = { local_id: string; preview_url: string; storage_path: string; size: number; uploading: boolean; existing?: boolean }
+
+// The log being written, kept on the device (D23) so a reload, a tap on
+// another section or the phone's Back never loses it: a new log per job,
+// and an edit to a saved log per log, against the log as it was saved.
+// Photos are kept by their stored path once uploaded.
+type LogDraft = {
+  summary: string
+  nextSteps: string
+  weatherText: string
+  crewCount: string
+  hoursWorked: string
+  photos: { storage_path: string; size: number; existing?: boolean }[]
+}
+const EMPTY_LOG: LogDraft = { summary: '', nextSteps: '', weatherText: '', crewCount: '', hoursWorked: '', photos: [] }
+const editKind = (logId: string) => `edit:job-log:${logId}`
+
+/** The form as a saved log fills it: what an edit to it starts from. */
+function seedFromRow(r: LogRow): LogDraft {
+  return {
+    summary: r.summary || '',
+    nextSteps: r.next_steps || '',
+    weatherText: r.weather_text || '',
+    crewCount: r.crew_count != null ? String(r.crew_count) : '',
+    hoursWorked: r.hours_worked != null ? String(r.hours_worked) : '',
+    photos: (Array.isArray(r.photos) ? r.photos : [])
+      .filter((p: any) => typeof p?.storage_path === 'string')
+      .map((p: any) => ({ storage_path: p.storage_path, size: Number(p.size) || 0, existing: true })),
+  }
+}
 
 export default function DailyLogsSection({ jobId, userId }: any) {
   // Delete takes a second tap on the same log's button (D57).
@@ -78,27 +111,39 @@ export default function DailyLogsSection({ jobId, userId }: any) {
   const queryClient = useQueryClient()
   const [rows, setRows] = useState<LogRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [composing, setComposing] = useState(false)
+  // Non-null when the compose form is editing an existing log rather
+  // than posting a new one. save() branches on this.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const editingRow = editingId ? rows.find((r) => r.id === editingId) : undefined
+  const editSeed = editingRow ? seedFromRow(editingRow) : null
+  const log = useEditDraft<LogDraft>(
+    editingId ? (editSeed ? editKind(editingId) : null) : (jobId ? `job-log:${jobId}` : null),
+    editSeed ?? EMPTY_LOG,
+    editSeed ? {} : { from: 'log' },
+  )
+  // A log brought back from the device opens where it was left.
+  const [composing, setComposing] = useState(log.dirty)
+  useEffect(() => { if (log.restored) setComposing(true) }, [log.restored])
   const addButtonRef = useRef<HTMLButtonElement>(null)
   const wasComposing = useRef(false)
   useEffect(() => {
     if (!composing && wasComposing.current) addButtonRef.current?.focus()
     wasComposing.current = composing
   }, [composing])
-  // Non-null when the compose form is editing an existing log rather
-  // than posting a new one. save() branches on this.
-  const [editingId, setEditingId] = useState<string | null>(null)
   // Map of storage_path → signed URL for photos referenced on rendered
   // log cards. Filled lazily as rows arrive.
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
 
   // Draft state (inline form, expanded on demand)
-  const [summary, setSummary] = useState('')
-  const [nextSteps, setNextSteps] = useState('')
-  const [weatherText, setWeatherText] = useState('')
-  const [crewCount, setCrewCount] = useState('')
-  const [hoursWorked, setHoursWorked] = useState('')
-  const [draftPhotos, setDraftPhotos] = useState<DraftPhoto[]>([])
+  const { summary, nextSteps, weatherText, crewCount, hoursWorked } = log.form
+  const setSummary = (value: string) => log.set('summary', value)
+  const setNextSteps = (value: string) => log.set('nextSteps', value)
+  const setWeatherText = (value: string) => log.set('weatherText', value)
+  const setCrewCount = (value: string) => log.set('crewCount', value)
+  const setHoursWorked = (value: string) => log.set('hoursWorked', value)
+  const [draftPhotos, setDraftPhotos] = useState<DraftPhoto[]>(() => log.form.photos.map((p) => ({
+    local_id: p.storage_path, preview_url: '', storage_path: p.storage_path, size: p.size, uploading: false, existing: p.existing
+  })))
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   // Bumped every time the draft is cleared (cancel, post, save, or a new
@@ -117,7 +162,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       .order('created_at', { ascending: false })
       .limit(50)
     if (error) {
-      toastError("Couldn't load daily logs", error.message)
+      toastError("Couldn't load daily logs", plainError(error, 'Try again.'))
       setRows([])
     } else {
       const list = (data || []) as LogRow[]
@@ -139,13 +184,28 @@ export default function DailyLogsSection({ jobId, userId }: any) {
 
   useEffect(() => { load() }, [load])
 
+  // The uploaded photos ride along in the stored draft.
+  const { set: setLog } = log
+  useEffect(() => {
+    setLog('photos', draftPhotos
+      .filter((p) => !p.uploading && p.storage_path)
+      .map((p) => ({ storage_path: p.storage_path, size: p.size, ...(p.existing ? { existing: true } : {}) })))
+  }, [draftPhotos, setLog])
+  // Photos of a draft brought back from the device have no preview yet.
+  const unsigned = draftPhotos.filter((p) => !p.preview_url && p.storage_path).map((p) => p.storage_path).join('|')
+  useEffect(() => {
+    if (!unsigned) return
+    let alive = true
+    void signedUrlsFor(queryClient, PHOTO_BUCKET, unsigned.split('|')).then((byPath) => {
+      if (!alive) return
+      setDraftPhotos((cur) => cur.map((p) => (!p.preview_url && byPath.get(p.storage_path) ? { ...p, preview_url: byPath.get(p.storage_path) as string } : p)))
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [unsigned, queryClient])
+
   function clearDraft() {
     draftGenRef.current += 1
-    setSummary('')
-    setNextSteps('')
-    setWeatherText('')
-    setCrewCount('')
-    setHoursWorked('')
+    log.discard()
     setEditingId(null)
     // Revoke any blob: URLs we created for previews so we don't leak.
     for (const p of draftPhotos) {
@@ -178,25 +238,43 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     // The edit replaces whatever draft was open, uploads included.
     removeStoredPhotos(draftUploads())
     clearDraft()
+    openEdit(r)
+  }
+
+  // The form opens on the saved log, or on the changes kept for it when
+  // they began from the log as it is now (the draft hook restores those).
+  // Opening stores nothing until something changes.
+  function openEdit(r: LogRow) {
+    const seed = seedFromRow(r)
+    const kept = draftWaiting(editKind(r.id), seed) ? readDraftEntry<Partial<LogDraft>>(editKind(r.id))?.form : null
+    const photos = { ...seed, ...kept }.photos
+    setDraftPhotos(photos.map((p) => ({
+      local_id: p.storage_path,
+      preview_url: photoUrls[p.storage_path] || '',
+      storage_path: p.storage_path,
+      size: p.size,
+      uploading: false,
+      existing: p.existing,
+    })))
     setEditingId(r.id)
-    setSummary(r.summary || '')
-    setNextSteps(r.next_steps || '')
-    setWeatherText(r.weather_text || '')
-    setCrewCount(r.crew_count != null ? String(r.crew_count) : '')
-    setHoursWorked(r.hours_worked != null ? String(r.hours_worked) : '')
-    const existing: DraftPhoto[] = (Array.isArray(r.photos) ? r.photos : [])
-      .filter((p: any) => typeof p?.storage_path === 'string')
-      .map((p: any) => ({
-        local_id: p.storage_path,
-        preview_url: photoUrls[p.storage_path] || '',
-        storage_path: p.storage_path,
-        size: Number(p.size) || 0,
-        uploading: false,
-        existing: true,
-      }))
-    setDraftPhotos(existing)
     setComposing(true)
   }
+
+  // An edit to a saved log that was left unsaved opens again once the logs
+  // are read, unless a new log is already being written. Changes kept for
+  // a log saved differently since are stale and are dropped.
+  const checkedEdits = useRef(false)
+  useEffect(() => {
+    if (checkedEdits.current || loading) return
+    checkedEdits.current = true
+    let waiting: LogRow | null = null
+    for (const r of rows) {
+      if (!readDraftEntry(editKind(r.id))) continue
+      if (draftWaiting(editKind(r.id), seedFromRow(r))) waiting = waiting ?? r
+      else forgetStoredDraft(editKind(r.id))
+    }
+    if (waiting && !composing && !editingId) openEdit(waiting)
+  }, [loading, rows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Upload one file at a time so failures don't poison the whole batch.
   // Matches the Photos.tsx pattern: compress → upload to job-photos →
@@ -212,7 +290,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     try {
       blob = await compressImageToBlob(file, 1_500_000, 1800)
     } catch (ex: any) {
-      toastError("Couldn't process photo", ex?.message || file.name)
+      toastError("Couldn't process photo", plainError(ex, `${file.name} could not be read. Try another photo.`))
       return null
     }
     if (!blob) return null
@@ -224,7 +302,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       .from(PHOTO_BUCKET)
       .upload(path, blob, { upsert: false, contentType: 'image/jpeg' })
     if (upErr) {
-      toastError('Upload failed', upErr.message)
+      toastError('Upload failed', plainError(upErr, 'Try again.'))
       return null
     }
     const previewUrl = URL.createObjectURL(blob)
@@ -314,7 +392,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
         .select('id')
       setSaving(false)
       if (error || !updated?.length) {
-        toastError("Couldn't save changes", error?.message || 'This log may have been deleted, or you can no longer edit it.')
+        toastError("Couldn't save changes", plainError(error, 'This log may have been deleted, or you can no longer edit it.'))
         return
       }
       // Photos taken off the log in this edit are no longer referenced.
@@ -344,7 +422,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     const { error } = await supabase.from('fh_daily_logs').insert(payload as any)
     setSaving(false)
     if (error) {
-      toastError("Couldn't post log", error.message)
+      toastError("Couldn't post log", plainError(error, 'Try again.'))
       return
     }
     clearDraft()
@@ -364,12 +442,14 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       .eq('user_id', userId)
       .select('id')
     if (error || !deleted?.length) {
-      toastError("Couldn't delete", error?.message || 'This log may already be gone, or you can no longer delete it.')
+      toastError("Couldn't delete", plainError(error, 'This log may already be gone, or you can no longer delete it.'))
       load()
       return
     }
-    // The log was the only thing pointing at its photos.
+    // The log was the only thing pointing at its photos, and at any edit
+    // kept for it.
     removeStoredPhotos(photoPaths(row?.photos))
+    forgetStoredDraft(editKind(id))
   }
 
   return (
@@ -410,6 +490,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
             background: 'var(--v3-surface)', border: '1px solid var(--v3-border)',
           }}
         >
+          {log.restored && <DraftRestored onDiscard={discardDraft} />}
           <Field
             label="Site summary"
             multiline

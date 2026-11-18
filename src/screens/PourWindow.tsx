@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ChevronLeft, MapPin, Wind, Droplets, CloudSun, AlertTriangle, Check, X } from 'lucide-react'
 import { useProfile } from '../contexts/ProfileContext.tsx'
-import { getWeather, weatherLabel, reverseGeocode, MURFREESBORO, WEATHER_FRESH_MS } from '../lib/weather.ts'
+import { useMembership } from '../contexts/MembershipContext.tsx'
+import { getWeather, weatherLabel, reverseGeocode, WEATHER_FRESH_MS } from '../lib/weather.ts'
 import { assessWorkWindow, assessTrade, assessedHourlyStrip } from '../lib/forecastAssessment.ts'
 import ForecastBasis from '../components/ForecastBasis.tsx'
 import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { Eyebrow } from '../components/v3'
+import LoadingValue from '../components/LoadingValue.tsx'
+import { Button, EmptyState } from '../components/fh'
 const SnowForecast = lazy(() => import('../components/desktop/SnowForecastBuild.tsx'))
 
 // Status token → brand palette mapping used across the whole screen.
@@ -70,7 +73,8 @@ function fmtDate(iso: any) {
 }
 
 export default function PourWindow() {
-  const { profile, upsertProfile, refresh } = useProfile()
+  const { profile, loading: profileLoading, upsertProfile, refresh } = useProfile()
+  const { canEditSettings } = useMembership()
   const navigate = useNavigate()
   const [weather, setWeather] = useState<any>(null)
   const [receivedAt, setReceivedAt] = useState<number | null>(null)
@@ -83,13 +87,19 @@ export default function PourWindow() {
   const [cityName, setCityName] = useState('')
 
   const hasCoords = profile?.location_lat != null && profile?.location_lon != null
+  // The forecast is only ever for the pinned spot. With none there is
+  // nothing to forecast: the screen asks for the location and never shows
+  // another town's weather as if it were theirs.
+  const noLocation = !profileLoading && !hasCoords
   const services = profile?.services || EMPTY_SERVICES
 
   useEffect(() => {
     let cancelled = false
-    const lat = profile?.location_lat ?? MURFREESBORO.lat
-    const lon = profile?.location_lon ?? MURFREESBORO.lon
-    setLoading(true); setErr(''); setForecastFailed(false); setWeather(null); setReceivedAt(null)
+    const lat = profile?.location_lat
+    const lon = profile?.location_lon
+    setErr(''); setForecastFailed(false); setWeather(null); setReceivedAt(null)
+    if (lat == null || lon == null) { setLoading(false); return }
+    setLoading(true)
     getWeather(lat, lon)
       .then((d) => { if (!cancelled) { setWeather(d); setReceivedAt(Date.now()) } })
       .catch(() => {
@@ -108,8 +118,10 @@ export default function PourWindow() {
   }, [])
 useEffect(() => {
     let cancelled = false
-    const lat = profile?.location_lat ?? MURFREESBORO.lat
-    const lon = profile?.location_lon ?? MURFREESBORO.lon
+    const lat = profile?.location_lat
+    const lon = profile?.location_lon
+    setCityName('')
+    if (lat == null || lon == null) return
     reverseGeocode(lat, lon).then((name) => {
       if (!cancelled && name) setCityName(name)
     })
@@ -183,6 +195,24 @@ useEffect(() => {
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
 
+  // The location is on each person's own profile, so anyone can pin it
+  // here. Settings holds the same control for those who can open it.
+  const askForLocation = noLocation ? (
+    <EmptyState
+      icon={MapPin}
+      title="Pin your location to see the forecast."
+      // A refused pin has to say why here: the strip that shows errors
+      // once a location is set is not on screen yet.
+      sub={err ? <span role="alert" style={{ color: 'var(--v3-danger-text)' }}>{err}</span> : undefined}
+      action={
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Button variant="primary" size="md" onClick={() => { hapticMedium(); pinLocation() }}>Pin location</Button>
+          {canEditSettings && <Button variant="secondary" size="md" to="/settings#location">Set location</Button>}
+        </div>
+      }
+    />
+  ) : null
+
   if (isDesktop) {
     return (
       <Suspense fallback={null}>
@@ -199,6 +229,7 @@ useEffect(() => {
           onPinLocation={pinLocation}
           onRetry={forecastFailed ? retryForecast : undefined}
           onGoToSchedule={() => navigate('/schedule')}
+          empty={askForLocation}
         />
       </Suspense>
     )
@@ -244,13 +275,16 @@ useEffect(() => {
         </motion.button>
       </motion.div>
 
+      {askForLocation && <motion.div variants={item} style={{ padding: '0 24px' }}>{askForLocation}</motion.div>}
+
+      {!askForLocation && <>
       {/* LOCATION / ERROR STRIP */}
       <motion.div variants={item} style={{ padding: '0 24px 12px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--ink-muted)', fontFamily: 'var(--font-body)', fontSize: 14 }}>
           <MapPin size={11} color="var(--field-gold-bright)" />
           {hasCoords
             ? (cityName || `${(profile.location_lat as any).toFixed(2)}, ${(profile.location_lon as any).toFixed(2)}`)
-            : (cityName || 'Murfreesboro, TN')}
+            : ''}
         </div>
         {err && (
           <div role="alert" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--v3-danger-text)', fontFamily: 'var(--font-body)' }}>
@@ -277,10 +311,18 @@ useEffect(() => {
               {currentCode == null ? 'Today' : `Today · ${weatherLabel(currentCode)}`}
             </Eyebrow>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10 }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, letterSpacing: '-.04em', lineHeight: 1, color: 'var(--ink-strong)' }}>
-                {loading || currentTemp == null ? '—' : Math.round(currentTemp)}
-              </span>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--ink-muted)', marginTop: 6 }}>°F</span>
+              {loading ? (
+                <LoadingValue label="Loading the temperature" width={88} height={52} />
+              ) : currentTemp == null ? (
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: 15, color: 'var(--ink-muted)' }}>No reading</span>
+              ) : (
+                <>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 52, letterSpacing: '-.04em', lineHeight: 1, color: 'var(--ink-strong)' }}>
+                    {Math.round(currentTemp)}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--ink-muted)', marginTop: 6 }}>°F</span>
+                </>
+              )}
             </div>
           </div>
           <div
@@ -318,12 +360,15 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Metric trio */}
-        <div className="fh-forecast-readings">
-          <Metric label="Wind" value={currentWind != null ? `${Math.round(currentWind)}` : '—'} unit="mph" />
-          <Metric label="Rain now" value={currentRain == null ? '—' : currentRain.toFixed(2)} unit='in/h' />
-          <Metric label="Humidity" value={currentHumidity != null ? `${Math.round(currentHumidity)}` : '—'} unit="%" />
-        </div>
+        {/* Metric trio. With no forecast at all the status line above already
+            says so, so the trio stays out of the way. */}
+        {(weather || loading) && (
+          <div className="fh-forecast-readings">
+            <Metric label="Wind" loading={loading} value={currentWind != null ? `${Math.round(currentWind)}` : null} unit="mph" />
+            <Metric label="Rain now" loading={loading} value={currentRain == null ? null : currentRain.toFixed(2)} unit='in/h' />
+            <Metric label="Humidity" loading={loading} value={currentHumidity != null ? `${Math.round(currentHumidity)}` : null} unit="%" />
+          </div>
+        )}
       </motion.section>
       <div style={{ margin: '0 24px' }}><ForecastBasis weather={weather} receivedAt={receivedAt} trades={tradeRows.map((r) => r.trade)} /></div>
 
@@ -533,6 +578,7 @@ useEffect(() => {
           })}
         </div>
       </motion.section>
+      </>}
     </motion.div>
   )
 }
@@ -566,7 +612,9 @@ function dayAggregateStatus(weather: any, services: any, dayIso: any) {
   return !samples || unknown ? 'unknown' : worst
 }
 
-function Metric({ label, value, unit }: { label: string; value: string; unit: string }) {
+// A reading that is loading shows a placeholder, and one the forecast did
+// not include says No reading, never a dash.
+function Metric({ label, value, unit, loading = false }: { label: string; value: string | null; unit: string; loading?: boolean }) {
   return (
     <div
       style={{
@@ -580,10 +628,12 @@ function Metric({ label, value, unit }: { label: string; value: string; unit: st
         {label}
       </span>
       <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, letterSpacing: 0, lineHeight: 1, color: 'var(--ink-strong)' }}>
-          {value}
-        </span>
-        {unit && (
+        {loading ? <LoadingValue label={`Loading ${label.toLowerCase()}`} width={40} height={20} /> : (
+          <span style={{ fontFamily: value == null ? 'var(--font-body)' : 'var(--font-display)', fontSize: value == null ? 13 : 20, letterSpacing: 0, lineHeight: 1, color: value == null ? 'var(--ink-muted)' : 'var(--ink-strong)' }}>
+            {value ?? 'No reading'}
+          </span>
+        )}
+        {unit && !loading && value != null && (
           <span style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--ink-faint)', letterSpacing: 0 }}>
             {unit}
           </span>

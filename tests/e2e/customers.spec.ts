@@ -4,11 +4,15 @@
 // /clients/:id/statement (also where Money's Who owes you goes), and
 // deleting a customer confirms with a second tap on the same button.
 // Nothing here mounts a dialog.
+import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { isReadOnlyRpc } from './helpers/readRpc.ts'
 import { contrastOf, textContrastAgainst } from './helpers/contrast.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
+import { goInApp, holdPosts, postsTo } from './helpers/doubleTap.ts'
+import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES } from './helpers/formatsSeed.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -82,6 +86,9 @@ test.describe('duplicates are reviewed on a screen', () => {
         fh_invoices: [{ id: 'inv-dup', user_id: USER.id, client_id: 'cl-dup', contact_id: null, amount: 500, status: 'sent', created_at: iso(NOW - DAY) }]
       }
     })
+    // The mock's database merge would move them in one call, so this
+    // company has not installed it yet and the app moves them itself.
+    await context.route('**/rest/v1/rpc/fh_merge_client_into', (route) => route.fulfill({ status: 404, json: { code: 'PGRST202', message: 'Could not find the function public.fh_merge_client_into(p_duplicates, p_survivor) in the schema cache' } }))
     const writes = watchWrites(page)
     await open(page, '/clients/merge')
     await expect(page.getByText('Leads, quotes, jobs, invoices and notes move to the kept client.', { exact: false })).toBeVisible()
@@ -94,6 +101,34 @@ test.describe('duplicates are reviewed on a screen', () => {
       expect(writes.some((w) => w.startsWith(`PATCH ${table}`)), table).toBe(true)
     }
     expect(writes.some((w) => w.startsWith('DELETE fh_clients'))).toBe(false)
+  })
+
+  // With the database merge installed, one call moves the duplicate's
+  // leads, quotes and invoices, the check finds nothing left on it, and it
+  // is deleted. The app's own moves still run after it and find nothing.
+  test('merging uses the database merge when the company has it', async ({ context, page }) => {
+    await signIn(context, {
+      tables: {
+        fh_clients: [JEFF, JEFF_AGAIN],
+        fh_leads: [{ id: 'lead-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Back patio', status: 'open', created_at: iso(NOW - DAY) }],
+        fh_quotes: [{ id: 'q-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Driveway', status: 'approved', amount: 12000, created_at: iso(NOW - DAY) }],
+        fh_invoices: [{ id: 'inv-dup', user_id: USER.id, client_id: 'cl-dup', contact_id: null, amount: 500, status: 'sent', created_at: iso(NOW - DAY) }]
+      }
+    })
+    const merges: Record<string, unknown>[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && req.url().includes('/rest/v1/rpc/fh_merge_client_into')) merges.push(req.postDataJSON())
+    })
+    const writes = watchWrites(page)
+    await open(page, '/clients/merge')
+    await page.getByRole('button', { name: 'Merge cluster' }).click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
+    await page.getByRole('button', { name: 'Tap again to merge' }).click()
+
+    await expect(page.getByText('All clean.')).toBeVisible()
+    expect(merges).toEqual([{ p_survivor: 'cl-1', p_duplicates: ['cl-dup'] }])
+    expect(writes.filter((w) => w.startsWith('DELETE fh_clients'))).toHaveLength(1)
+    await expect(page.getByText(/could not be moved/)).toHaveCount(0)
   })
 
   test('a failed clients read says so instead of "All clean" (S23)', async ({ context, page }) => {
@@ -215,7 +250,7 @@ test.describe('the customer page', () => {
     await expect(page.locator('.fhcs-total__amount')).toHaveText('$6,900.25')
     const apart = page.getByRole('list', { name: 'Not yet invoiced' })
     await expect(apart.getByText('Garage slab')).toBeVisible()
-    await expect(apart.getByText('$33,100', { exact: true })).toBeVisible()
+    await expect(apart.getByText('$33,100.00', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Email statement' }).click()
     await expect.poll(() => posted.length).toBe(1)
@@ -277,11 +312,12 @@ test.describe('the customer page', () => {
       }
     })
     await open(page, '/clients/cl-direct')
-    // Phone: "Lifetime $1.3K", "Contract balance $500". Desktop: "$1K
-    // Lifetime value", "$500 Remaining contract value". Both read $0 before.
+    // Phone: "Lifetime $1,300.00", "Contract balance $500.00". Desktop:
+    // "$1,300.00 Lifetime value", "$500.00 Remaining contract value". Both
+    // read $0 before, and a rounded "$1.3K" until formats-4.
     const main = page.locator('main')
-    await expect(main).toContainText(/Lifetime\s*\$1\.3K|\$1(\.3)?K\s*Lifetime value/, { timeout: 30_000 })
-    await expect(main).toContainText(/Contract balance\s*\$500|\$500\s*Remaining contract value/)
+    await expect(main).toContainText(/Lifetime\s*\$1,300\.00|\$1,300\.00\s*Lifetime value/, { timeout: 30_000 })
+    await expect(main).toContainText(/Contract balance\s*\$500\.00|\$500\.00\s*Remaining contract value/)
   })
 
   test('Map opens the map app for this device, not Apple Maps on Android (S25)', async ({ context, page }) => {
@@ -383,6 +419,40 @@ test.describe('the desktop Customers table', () => {
     created_at: iso(NOW - 400 * DAY), last_activity_at: iso(NOW - touchedDaysAgo * DAY)
   })
 
+  // A new company has no clients. The table used to say "No clients
+  // match", which reads as a filter hiding records. It now says what a
+  // client is and offers the first one; "No clients match" is kept for a
+  // search that hides rows.
+  test('an empty book explains what a client is and offers the first one', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [] } })
+    await open(page, '/clients')
+    const main = page.locator('#fh-main')
+    await expect(main.getByText('No clients yet.', { exact: true })).toBeVisible()
+    await expect(main.getByText('A client is the person you work for. Bills get sent to them, jobs roll up to them.', { exact: true })).toBeVisible()
+    await expect(main).not.toContainText('No clients match')
+    await expect(main.getByRole('button', { name: 'Export CSV' })).toBeDisabled()
+    await main.getByRole('button', { name: 'Add your first client', exact: true }).click()
+    await expect(page).toHaveURL(/\/clients\/new/)
+  })
+
+  test('a search that hides every client says nothing matches', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_clients: [client('c-z', 'Zed Builders', 2)] } })
+    await open(page, '/clients')
+    await page.getByRole('textbox', { name: 'Search clients' }).fill('qqq')
+    await expect(page.locator('#fh-main')).toContainText('No clients match.')
+    await expect(page.getByText('No clients yet.', { exact: true })).toHaveCount(0)
+  })
+
+  test('an empty sub list explains what a sub is and offers the first one', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_subs: [] } })
+    await open(page, '/subs')
+    const main = page.locator('#fh-main')
+    await expect(main.getByText('No subs yet.', { exact: true })).toBeVisible()
+    await expect(main).not.toContainText('No vendors match')
+    await main.getByRole('button', { name: 'Add your first sub', exact: true }).click()
+    await expect(page).toHaveURL(/\/subs\/new$/)
+  })
+
   test('sorts by name ignoring case, keeps the sort while searching, and shows the year of an old touch', async ({ context, page }) => {
     await signIn(context, { tables: { fh_clients: [client('c-z', 'Zed Builders', 2), client('c-a', 'alpha Concrete', 3), client('c-b', 'Bravo Paving', 395)] } })
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -443,3 +513,189 @@ for (const mode of ['day', 'night'] as const) {
     await expect.poll(() => textContrastAgainst(button, ['var(--v3-primary-hot)', 'var(--v3-primary)'])).toBeGreaterThanOrEqual(4.5)
   })
 }
+
+// Email statement kept its busy state on the statement screen. Leave it
+// while the email is still going out and come back, and the button was
+// free again: one more tap emailed the statement twice. The send is now
+// kept app wide, so the statement is busy until it lands.
+test('leaving the statement while it emails and coming back does not email it twice', async ({ context, page }) => {
+  await signIn(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"job-files/statement.pdf"}' }))
+  const sends = postsTo(context, '/api/send-statement')
+  await holdPosts(context, '**/api/send-statement', 6000, () => ({ status: 200, json: { ok: true } }))
+  await open(page, '/clients/cl-1/statement')
+  const email = page.getByRole('button', { name: 'Email statement' })
+  await expect(email).toBeEnabled({ timeout: 30_000 })
+  await email.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  await goInApp(page, '/clients/cl-1')
+  await page.waitForTimeout(800)
+  await goInApp(page, '/clients/cl-1/statement')
+  const again = page.getByRole('button', { name: 'Email statement' })
+  await expect(again).toBeVisible({ timeout: 30_000 })
+  // Once the screen has read what it needs, the button takes a tap or says it is busy.
+  await expect.poll(async () => await again.isEnabled() || await again.getAttribute('aria-busy') === 'true', { timeout: 30_000 }).toBe(true)
+  const busy = await again.getAttribute('aria-busy')
+  await again.click({ force: true })
+  await page.waitForTimeout(1500)
+  expect(sends.length, 'one statement, one email').toBe(1)
+  expect(busy, 'Email statement shows the email going out').toBe('true')
+})
+
+// formats-4: one customer's money reads to the cent, the figure Money and
+// the statement show, never "$12K" or "$11K".
+test('the customer page and Customers show a customer\'s money to the cent', async ({ context, page }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  await expect(page.getByText(/\$12,345\.50/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/\$11,345\.00/).first()).toBeVisible()
+  expect(await page.locator('main').innerText()).not.toMatch(/\$\d+(\.\d)?K\b/)
+  await nothingRunsOffTheSide(page, 'customer page')
+  // The longer figures sit side by side without drawing over each other.
+  // Measure the drawn text, not the box: a number wider than its column
+  // spills past a box clipped to the column.
+  const drawn = (text: string) => page.getByText(text, { exact: true }).first().evaluate((el) => {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    const r = range.getBoundingClientRect()
+    return { x: r.x, y: r.y, width: r.width, height: r.height }
+  })
+  const lifetime = await drawn('$12,345.50')
+  const balance = await drawn('$11,345.00')
+  const apart = lifetime.x + lifetime.width <= balance.x || balance.x + balance.width <= lifetime.x ||
+    lifetime.y + lifetime.height <= balance.y || balance.y + balance.height <= lifetime.y
+  expect(apart, 'Lifetime and Contract balance do not overlap').toBe(true)
+  await open(page, '/clients')
+  await expect(page.getByText(/\$11,345\.00/).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(await page.locator('main').innerText()).not.toMatch(/\$\d+(\.\d)?K\b/)
+  await nothingRunsOffTheSide(page, 'Customers')
+})
+
+// formats-5: the Statement button on the customer page names the total the
+// statement it opens shows: what is owed on sent invoices, not the contract
+// less what was paid.
+test('the Statement button names the total the statement shows', async ({ context, page, isMobile }) => {
+  test.skip(!isMobile, 'the phone customer page names the total on its Statement button')
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  const button = page.getByRole('button', { name: /^Statement · / })
+  await expect(button).toHaveText(/Statement · \$3,114\.67 across 1 property/, { timeout: 30_000 })
+  await button.click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+  await expect(page.locator('.fhcs-total__amount')).toHaveText('$3,114.67')
+})
+
+// formats-5: the Statement control stays one tap away while its total is
+// still loading or could not be read, and for a customer whose only balance
+// is work not yet invoiced. It names a figure only once the read is in.
+test('the Statement control stays one tap away without its total', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_invoices: [], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  // The statement's own read of invoices fails; the rest of the page loads.
+  await page.route(/\/rest\/v1\/fh_invoices\?.*status=neq\.void/, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"down"}' }))
+  await open(page, '/clients/cl-h')
+  const control = isMobile
+    ? page.getByRole('button', { name: /^Statement/ })
+    : page.locator('.fh-build-tabs__cta').filter({ hasText: /Statement/ })
+  await expect(control.first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: /^Statement · \$/ })).toHaveCount(0)
+  await control.first().click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+})
+
+test('the Statement control shows for work not yet invoiced', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_invoices: [], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  const control = isMobile
+    ? page.getByRole('button', { name: /^Statement/ })
+    : page.locator('.fh-build-tabs__cta').filter({ hasText: /Statement/ })
+  await expect(control.first()).toBeVisible({ timeout: 30_000 })
+  await control.first().click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+})
+
+// formats-14: the Customers export writes each customer's last activity as
+// the local day the app shows, not the UTC day, which is already tomorrow
+// after 6 pm Central.
+test('the Customers export writes the local day of the last activity', async ({ context, page, isMobile }) => {
+  test.skip(isMobile, 'the export is on the desktop Customers table')
+  // Mon Nov 16, 7:30 pm Central, which is Nov 17 in UTC.
+  const evening = '2026-11-17T01:30:00Z'
+  await signIn(context, { tables: {
+    fh_clients: [{ ...JEFF, created_at: evening, updated_at: evening, last_activity_at: evening }],
+    fh_contacts: [{ id: 'j-csv', user_id: USER.id, client_id: 'cl-1', name: 'Jeff Roy', job_title: 'Driveway', stage: 'job', amount: 1000, created_at: evening, updated_at: evening }],
+    fh_invoices: [], fh_payments: [], fh_leads: [], fh_quotes: []
+  } })
+  await page.clock.setFixedTime(new Date('2026-11-17T02:00:00Z'))
+  await open(page, '/clients')
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30_000 }),
+    page.getByRole('button', { name: /Export CSV/ }).click()
+  ])
+  const csv = readFileSync(await download.path(), 'utf8')
+  const row = csv.split(/\r?\n/).find((line) => line.startsWith('Jeff Roy'))!
+  expect(row).toContain('2026-11-16')
+  expect(row).not.toContain('2026-11-17')
+})
+
+// formats-10: the customer's phone reads "(615) 555-0101" on every tab of
+// the customer page and on the job, the way the phone page prints it.
+test('the customer page and the job print the phone formatted', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: FORMATS_TABLES })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h?tab=projects')
+  if (isMobile) await page.goto('/clients/cl-h', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText(/\(615\) 555-0101/).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  expect(await page.locator('main').innerText()).not.toContain('6155550101')
+  await page.goto('/jobs/c-h', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByRole('heading', { name: 'Driveway replacement' }).first()).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(1500)
+  expect(await page.locator('main').innerText()).not.toContain('6155550101')
+})
+
+// Finding lost-work-12: a customer being edited keeps what was typed through
+// a reload, opened from the Edit control or from a link.
+test('a customer being edited keeps the typed notes through a reload', async ({ context, page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await signIn(context)
+  await open(page, '/clients/cl-1?edit=contact')
+  const notes = () => page.locator('label', { hasText: 'Notes' }).locator('textarea')
+  await expect(notes()).toBeVisible({ timeout: 30_000 })
+  await notes().fill(words)
+  await page.reload()
+  await expect(notes()).toHaveValue(words)
+  await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+})
+
+// Review of lost-work-12: the customer edit opens again only for changes
+// that still match the customer as saved.
+test('a customer edit left with changes opens again, and a stale one does not', async ({ context, page }) => {
+  const words = 'Gate code 4411, dog in the yard'
+  await signIn(context)
+  await open(page, '/clients/cl-1?edit=contact')
+  const notes = () => page.locator('label', { hasText: 'Notes' }).locator('textarea')
+  await expect(notes()).toBeVisible({ timeout: 30_000 })
+  await notes().fill(words)
+  await page.waitForTimeout(600)
+  await open(page, '/clients/cl-1')
+  await expect(notes()).toHaveValue(words, { timeout: 30_000 })
+  await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+  // The customer was saved differently on another device since. Leave the
+  // screen first, so it writes nothing more.
+  await page.waitForTimeout(600)
+  await page.goto('about:blank')
+  await page.goto('/')
+  await page.evaluate(() => {
+    const key = 'fh:draft:edit:client:cl-1'
+    const entry = JSON.parse(localStorage.getItem(key) || '{}')
+    localStorage.setItem(key, JSON.stringify({ ...entry, base: { ...entry.base, name: 'A name saved elsewhere' } }))
+  })
+  await open(page, '/clients/cl-1')
+  await expect(page.getByRole('button', { name: 'Back to clients' }).first()).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(500)
+  await expect(page.getByRole('button', { name: 'Save changes' })).toHaveCount(0)
+  await expect(notes()).toHaveCount(0)
+})

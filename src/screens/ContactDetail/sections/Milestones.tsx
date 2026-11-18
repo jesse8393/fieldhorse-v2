@@ -29,8 +29,10 @@ export default function MilestonesSection({ contact, patch }: any) {
     setDraftError(false)
     hapticTap()
     const next = [...list, { label: txt, done: false, created_at: new Date().toISOString() }]
-    setDraft('')
-    await patch({ milestones: next })
+    const res = await patch({ milestones: next })
+    // The box keeps the words until the save lands, so a refused save can
+    // be tried again without retyping. Newer typing is left alone.
+    if (!res?.error) setDraft((current) => (current.trim() === txt ? '' : current))
   }
 
   async function toggle(i: any) {

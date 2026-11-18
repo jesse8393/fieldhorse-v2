@@ -8,7 +8,8 @@ import { laborBooksAsExpense } from '../lib/labor.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { Eyebrow } from './v3'
-import { countNoun } from '../lib/format.ts'
+import { countNoun, moneyCents } from '../lib/format.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // Time clock card, Phase 19 / Upgrade Move #A2.
 //
@@ -85,6 +86,11 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
   const [rate, setRate] = useState(readPreferredRate())
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  // Clock in waits up to 4 seconds for a location before it writes, so a
+  // second tap in that time must do nothing. The ref is read at once; the
+  // state redraws the button as working.
+  const [clockingIn, setClockingIn] = useState(false)
+  const clockingInRef = useRef(false)
   const tickRef = useRef<any>(null)
   // Only the job owner books labor as an expense row; everyone else's
   // punch is priced by lib/labor.ts (see laborBooksAsExpense).
@@ -134,6 +140,9 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
   }, [start])
 
   async function handleClockIn() {
+    if (clockingInRef.current) return
+    clockingInRef.current = true
+    setClockingIn(true)
     hapticTap()
     try {
       const punch = await dbPunchIn({ userId, contactId: contact.id })
@@ -150,8 +159,13 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       if (msg.includes('one_active_per_user') || ex?.code === '23505') {
         toastError('Already on the clock', 'Clock out before starting a new shift.')
       } else {
-        toastError("Couldn't clock in", msg || 'Try again')
+        // Plain words, never the database's or the browser's own, as on
+        // Crew home (OPS-18, raw-errors-11).
+        toastError("Couldn't clock in", plainError(ex, 'Your shift did not start. Try again.'))
       }
+    } finally {
+      clockingInRef.current = false
+      setClockingIn(false)
     }
   }
 
@@ -202,7 +216,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
         const { error } = await supabase.from('fh_expenses').insert({
           user_id: userId,
           contact_id: contact.id,
-          description: note.trim() || `Labor, ${hours.toFixed(2)} ${countNoun(hours, 'hr')} @ $${rate}/hr`,
+          description: note.trim() || `Labor, ${hours.toFixed(2)} ${countNoun(hours, 'hr')} @ ${moneyCents(rate)}/hr`,
           amount: billable,
           category: 'Labor',
           expense_date: todayYmd()
@@ -248,14 +262,14 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
       hapticSuccess()
       toastSuccess(
         'Time logged',
-        `${hours.toFixed(2)} ${countNoun(hours, 'hr')}${bookAsExpense ? ` · $${billable.toLocaleString()}` : ''}`
+        `${hours.toFixed(2)} ${countNoun(hours, 'hr')}${bookAsExpense ? ` · ${moneyCents(billable)}` : ''}`
           + (endedElsewhere ? '. The shift had already been clocked out elsewhere, so its end time stays as it was.' : '')
       )
       // Refresh job cost / margin
       try { await recalcCost(contact.id, userId) } catch {}
       onLogged?.()
     } catch (ex: any) {
-      toastError("Couldn't log time", ex?.message || 'Try again')
+      toastError("Couldn't log time", plainError(ex, 'Your hours are still on the clock. Try again.'))
     } finally {
       setSaving(false)
     }
@@ -297,9 +311,11 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           <button
             type="button"
             onClick={handleClockIn}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', minHeight: 44, background: 'var(--fh-gold)', color: 'var(--fh-on-gold)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: 'pointer' }}
+            disabled={clockingIn}
+            aria-busy={clockingIn || undefined}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 12px', borderRadius: 10, border: 'none', minHeight: 44, background: 'var(--fh-gold)', color: 'var(--fh-on-gold)', fontFamily: 'var(--font-display)', fontSize: 12, letterSpacing: 0, cursor: clockingIn ? 'wait' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
           >
-            <Play size={12} /> Clock in
+            <Play size={12} /> {clockingIn ? 'Clocking in…' : 'Clock in'}
           </button>
         )}
         {start && !confirming && (
@@ -339,7 +355,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <Eyebrow style={{ color: 'var(--ink-muted)' }}>Billable</Eyebrow>
               <span style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid var(--rule)', background: 'var(--surface-2)', fontFamily: 'var(--font-display)', fontSize: 14, color: 'var(--v3-primary-text)' }}>
-                ${billablePreview.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                {moneyCents(billablePreview)}
               </span>
             </div>
           </div>}
@@ -352,7 +368,7 @@ export default function TimeClockCard({ contact, userId, onLogged }: any) {
           />
           {hoursPreview < 0.05 && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--v3-primary-text)' }}>
-              <AlertTriangle size={11} /> Less than 3 minutes, sure?
+              <AlertTriangle size={11} /> Less than 3 minutes. Log it anyway?
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

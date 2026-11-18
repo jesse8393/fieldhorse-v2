@@ -54,3 +54,34 @@ describe('composeActivityEvents payments', () => {
     expect(events).toHaveLength(0)
   })
 })
+
+// formats-3: the job's activity names a payment to the cent, the same
+// figure the invoice and the payment row show.
+describe('composeActivityEvents money', () => {
+  it('keeps the cents on payments and change orders', () => {
+    const events = composeActivityEvents({
+      payments: [{ id: 'p1', amount: 1000.5, method: 'check', paid_on: '2026-11-12', created_at: '2026-11-13T02:15:00Z' }],
+      changeOrders: [{ id: 'co1', sequence_number: 1, title: 'Extra rebar', amount: 1235.5, status: 'pending', created_at: '2026-11-10T15:00:00Z' }]
+    })
+    expect(events.find((e) => e.kind === 'payment')!.title).toBe('$1,000.50 received')
+    expect(events.find((e) => e.kind === 'change_order')!.sub).toBe('+$1,235.50')
+  })
+
+  it('prints a whole payment with .00', () => {
+    const events = composeActivityEvents({
+      payments: [{ id: 'p1', amount: 6400, method: 'check', paid_on: '2026-11-12', created_at: '2026-11-12T15:00:00Z' }]
+    })
+    expect(events[0].title).toBe('$6,400.00 received')
+  })
+})
+
+// formats-12: a visit in the job activity reads "Nov 18, 7:00 am", the
+// time written the way every screen writes it.
+describe('composeActivityEvents schedule time', () => {
+  it('writes the visit time with am or pm in lower case', () => {
+    const events = composeActivityEvents({
+      scheduleItems: [{ id: 's1', title: 'Pour driveway', start_at: '2026-11-18T13:00:00Z', created_at: '2026-11-10T12:00:00Z' }]
+    })
+    expect(events[0].sub).toBe('Nov 18, 7:00 am')
+  })
+})

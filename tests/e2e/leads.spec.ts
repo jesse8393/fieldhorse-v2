@@ -434,3 +434,47 @@ test.describe('a lead can be kept up to date (S13)', () => {
     await expect(page.getByRole('button', { name: 'Edit details' })).toBeVisible()
   })
 })
+
+// Finding lost-work-10: notes the server refused to save are kept on the
+// device, come back and are tried again.
+const TYPED = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+test.describe('typed words on the lead screen', () => {
+  const WORDS = TYPED
+
+  test('notes the server refused come back when the lead is opened again, and are tried again', async ({ context, page }) => {
+    await signIn(context)
+    const refused: string[] = []
+    await page.route(/\/rest\/v1\/fh_leads\?/, async (route) => {
+      if (route.request().method() !== 'PATCH') return route.fallback()
+      refused.push(route.request().postData() ?? '')
+      return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: '57014', message: 'canceling statement due to statement timeout', details: null, hint: null }) })
+    })
+    await open(page, '/leads')
+    await page.getByText('Vintage Burkitt Station Drainage').first().click()
+    const notes = page.getByLabel('Notes')
+    await expect(notes).toBeVisible({ timeout: 30_000 })
+    await notes.fill(WORDS)
+    await page.getByRole('button', { name: 'Back' }).first().click()
+    await expect.poll(() => refused.length).toBeGreaterThan(0)
+    await page.getByText('Vintage Burkitt Station Drainage').first().click()
+    await expect(page.getByLabel('Notes')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    const tries = refused.length
+    await expect.poll(() => refused.length, { timeout: 8000 }).toBeGreaterThan(tries)
+  })
+})
+
+// Finding lost-work-12: lead details being edited are kept on the device.
+test.describe('lead details being edited', () => {
+  const WORDS = TYPED
+
+  test('lead details being edited stay open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/leads/l-lead1')
+    await page.getByRole('button', { name: 'Edit details' }).click()
+    await page.getByRole('textbox', { name: 'What they need' }).fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('textbox', { name: 'What they need' })).toHaveValue(WORDS)
+  })
+})

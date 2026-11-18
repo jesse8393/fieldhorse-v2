@@ -1,6 +1,10 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import { KEYBOARD_MIN_PX } from '../lib/useKeyboardOpen.ts'
 import './record-picker.css'
+
+// About three results: the least room the open list should have.
+const LIST_ROOM_PX = 160
 
 export type RecordOption = { value: string; label: string; description?: string; group?: string }
 type Props = {
@@ -28,10 +32,50 @@ export default function RecordPicker({ id, label, value, onChange, options, plac
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const input = useRef<HTMLInputElement>(null)
+  const list = useRef<HTMLDivElement>(null)
   const selected = options.find((option) => option.value === value)
   const filtered = useMemo(() => filterRecordOptions(options, query), [options, query])
   const shown = allowClear && !query.trim() ? [{ value: '', label: clearLabel }, ...filtered] : filtered
   const current = Math.min(active, Math.max(0, shown.length - 1))
+
+  // With a phone keyboard up only the visual viewport shrinks, so the list
+  // at its usual height ran under the keyboard and its last results could
+  // not be scrolled into sight. When the room under the field is short,
+  // bring the field up (never under the header), then hold the list to the
+  // room that is left above the keyboard.
+  useEffect(() => {
+    const vv = window.visualViewport
+    const box = list.current
+    if (!open || !vv || !box) return
+    const fit = () => {
+      if (window.innerHeight - vv.height <= KEYBOARD_MIN_PX) {
+        box.style.removeProperty('max-height')
+        return
+      }
+      const bottom = vv.offsetTop + vv.height - 8
+      let room = bottom - box.getBoundingClientRect().top
+      const want = Math.min(LIST_ROOM_PX, box.scrollHeight)
+      const field = input.current
+      if (room < want && field) {
+        const header = document.querySelector('.fh-app-header')?.getBoundingClientRect().bottom ?? 0
+        const above = field.getBoundingClientRect().top - Math.max(vv.offsetTop, header) - 8
+        const by = Math.min(want - room, above)
+        if (by > 0) {
+          window.scrollBy({ top: by, behavior: 'instant' as ScrollBehavior })
+          room = bottom - box.getBoundingClientRect().top
+        }
+      }
+      box.style.maxHeight = `min(280px, 40vh, ${Math.max(48, Math.floor(room))}px)`
+    }
+    fit()
+    vv.addEventListener('resize', fit)
+    vv.addEventListener('scroll', fit)
+    return () => {
+      vv.removeEventListener('resize', fit)
+      vv.removeEventListener('scroll', fit)
+      box.style.removeProperty('max-height')
+    }
+  }, [open])
 
   function choose(option: RecordOption) {
     onChange(option.value)
@@ -71,7 +115,7 @@ export default function RecordPicker({ id, label, value, onChange, options, plac
       {open && (
         <div className="fh-record-picker__results">
           <div role="status" className="fh-record-picker__status">{loading ? 'Loading records' : `${filtered.length} ${filtered.length === 1 ? 'record' : 'records'} found`}</div>
-          <div id={listId} role="listbox" aria-label={label} className="fh-record-picker__list">
+          <div id={listId} ref={list} role="listbox" aria-label={label} className="fh-record-picker__list">
             {shown.map((option, index) => (
               <div key={option.value} id={`${listId}-${index}`} role="option" aria-selected={option.value === value}
                 className={`fh-record-picker__option${index === current ? ' is-active' : ''}`}

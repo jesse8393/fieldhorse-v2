@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import RecordPicker from '../components/RecordPicker.tsx'
 import CommunicationHistory from '../components/CommunicationHistory.tsx'
 import { emailDraft, plainDraft as stripMarkdown } from '../lib/composeDraft.ts'
 import { motion } from 'framer-motion'
-import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw } from 'lucide-react'
+import { Sparkles, Copy, Check, MessageSquare, Mail, Mic, Send, PenLine, RotateCw, ChevronLeft } from 'lucide-react'
+import { IconButton } from '../components/fh'
+import { recordRoute } from '../lib/records.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import BuildTopbar from '../components/desktop/BuildTopbar.tsx'
 import { supabase, authHeaders } from '../lib/supabase.ts'
@@ -14,11 +16,17 @@ import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { claudeMessage, getAiReadiness } from '../lib/anthropic.ts'
 import { toastSuccess, toastError } from '../lib/toast.ts'
-import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
+import { hapticMedium, hapticSuccess, hapticTap } from '../lib/haptics.ts'
+import './new/new.css'
 import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
-import { aiDraftError } from '../lib/serviceErrors.ts'
+import { formatPhone } from '../lib/utils.ts'
+import { aiDraftError, plainError } from '../lib/serviceErrors.ts'
+import { timeOfDay } from '../lib/dates.ts'
+import { useEditDraft } from '../lib/useEditDraft.ts'
+import { clearDraft } from '../lib/drafts.ts'
+import DraftRestored from '../components/DraftRestored.tsx'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -40,6 +48,17 @@ export default function Compose() {
   const { user } = useAuth()
   const { profile } = useProfile()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
+  // Back to the screen Compose was opened from, such as the job's Message.
+  // Opened from a link with nothing behind it, Back goes to the job it
+  // writes to, or Today (dead-ends-4).
+  function goBack() {
+    hapticTap()
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0
+    if (idx > 0) { navigate(-1); return }
+    const job = params.get('contact')
+    navigate(job ? recordRoute('job', job) : '/', { replace: true })
+  }
   const [channel, setChannel] = useState(() => params.get('channel') === 'email' ? 'email' : 'sms')
   const [intent, setIntent] = useState(INTENTS[0])
   const [contactId, setContactId] = useState(() => params.get('contact') || '')
@@ -53,10 +72,33 @@ export default function Compose() {
   const [handoff, setHandoff] = useState<{ contactId: string; channel: string; body: string; subject?: string; to: string } | null>(null)
   const [loggingHandoff, setLoggingHandoff] = useState(false)
   const sendLock = useRef(false)
-  const [context, setContext] = useState('')
-  const [draft, setDraft] = useState('')
-  // Writing is always available, whether or not AI is configured.
-  const [manual, setManual] = useState(false)
+  // The message and its context stay on the device until the message is
+  // sent or recorded, so a reload or Back keeps them (D23). Each customer
+  // has their own, so a message written for one never comes back when
+  // Compose opens for another.
+  const words = useEditDraft(`compose:${contactId || 'none'}`, { context: '', draft: '' }, { from: 'compose' })
+  const { context, draft } = words.form
+  const setContext = (value: string) => words.set('context', value)
+  const setDraft = (value: string) => words.set('draft', value)
+  // Words typed before any customer was chosen go with the customer chosen
+  // next, unless that customer already has a message waiting.
+  const carry = useRef<{ context: string; draft: string } | null>(null)
+  useEffect(() => {
+    const typed = carry.current
+    carry.current = null
+    if (!typed || !contactId || words.dirty) return
+    words.patch(typed)
+    clearDraft('compose:none')
+  }, [contactId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // The one message kept before messages were kept per customer: nobody
+  // can tell whose it was, so it is not shown.
+  useEffect(() => { clearDraft('compose') }, [])
+  // Writing is always available, whether or not AI is configured. A
+  // message brought back from the device opens where it can be edited.
+  const [manual, setManual] = useState(() => words.restored && draft.trim() !== '')
+  useEffect(() => {
+    if (words.restored && draft.trim()) setManual(true)
+  }, [contactId, words.restored]) // eslint-disable-line react-hooks/exhaustive-deps
   const [loading, setLoading] = useState(false)
   const [aiReadiness, setAiReadiness] = useState<'configured' | 'unavailable' | 'unknown'>('unknown')
   const [readinessAttempt, setReadinessAttempt] = useState(0)
@@ -111,6 +153,7 @@ export default function Compose() {
   }, [params])
 
   function chooseContact(value: string) {
+    if (!contactId && value && words.dirty) carry.current = { context, draft }
     setContactId(value)
     setHandoff(null)
     setSent(false)
@@ -138,13 +181,13 @@ export default function Compose() {
         // phrasing in the system prompt, the recipient never knows a
         // platform exists. Sender identity comes from the contractor's
         // profile.company_name with a neutral fallback.
-        system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
+        system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${profile?.company_name || 'the contractor'}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Plain punctuation: no em dashes, no en dashes, no hyphens used as dashes, and no exclamation marks. Sign off as ${profile?.company_name || 'the contractor'}; never mention any platform, app, or tool by name.`,
         messages: [{ role: 'user', content: `Intent: ${intent}\n${contactLine}\nExtra context: ${context || 'none'}\n\nReturn only the message text, no preamble.` }],
         maxTokens: 500
       })
       const text = res?.content?.[0]?.text || ''
       if (!text) throw new Error('Empty response from AI')
-      hapticSuccess(); setDraft(text); setManual(false)
+      hapticSuccess(); setDraft(stripMarkdown(text)); setManual(false)
       toastSuccess('Draft ready', 'Copy, send, or edit')
     } catch (e: any) {
       console.error('[compose] generate failed:', e)
@@ -191,6 +234,7 @@ export default function Compose() {
       })
       if (error) throw error
       setHandoff(null)
+      words.done({ keep: true })
       setHistoryVersion((value) => value + 1)
       toastSuccess('Communication recorded', 'Delivery and replies stay in your messaging app.')
     } catch {
@@ -244,6 +288,7 @@ export default function Compose() {
 
       hapticSuccess()
       setSent(true)
+      words.done({ keep: true })
       setHistoryVersion((value) => value + 1)
       if (data.history_saved === false) toastError('Email sent, history unavailable', 'Do not send again. The email provider accepted this message, but its history could not be saved.')
       toastSuccess(
@@ -254,7 +299,7 @@ export default function Compose() {
     } catch (e: any) {
       // Sending is a separate action from drafting; report its failure
       // without replacing the message or the drafting status.
-      toastError("Couldn't send the email", e?.message || 'Try again in a moment.')
+      toastError("Couldn't send the email", plainError(e, 'Try again in a moment.'))
     } finally {
       sendLock.current = false
       setSending(false)
@@ -296,14 +341,22 @@ export default function Compose() {
         // full-width spanner pins them above the columned content.
         <div style={{ gridColumn: '1 / -1' }}>
           <BuildTopbar />
-          <div style={{ padding: '12px var(--v3-gutter) 12px' }}>
-            <div className="fh-build-good">Dispatch</div>
-            <h1 className="fh-build-title">Message composer</h1>
-            <Link to="/inbox?view=history" className="fh-build-outline-btn">Communication history</Link>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px var(--v3-gutter) 12px' }}>
+            <IconButton aria-label="Back" icon={ChevronLeft} variant="plain" size={44} onClick={goBack} />
+            <div>
+              <div className="fh-build-good">Dispatch</div>
+              <h1 className="fh-build-title">Message composer</h1>
+              <Link to="/inbox?view=history" className="fh-build-outline-btn">Communication history</Link>
+            </div>
           </div>
         </div>
       )}
-      {!isDesktop && <h1 style={{ padding: '16px 24px 4px', fontSize: 'var(--fh-type-page)', margin: 0 }}>Message composer</h1>}
+      {!isDesktop && (
+        <header className="fhnew-head">
+          <IconButton aria-label="Back" icon={ChevronLeft} variant="plain" size={44} onClick={goBack} />
+          <h1 className="fhnew-title">Message composer</h1>
+        </header>
+      )}
       {/* INPUT COCKPIT, black-glass panel: header eyebrow + channel pills
           + intent + contact + context chips + CTA */}
       <motion.div className="fh-compose-workspace__input" variants={item} style={{ padding: '8px 24px 12px' }}>
@@ -401,12 +454,14 @@ export default function Compose() {
                 <Link className="fh-build-outline-btn" to={contact.client_id ? `/clients/${contact.client_id}?edit=contact` : `/jobs/${contact.id}`} style={{ minHeight: 44 }}>Add contact details</Link>
               </div>}
 
+              {words.restored && <DraftRestored onDiscard={words.discard} />}
+
               <Field label="Extra context">
                 <textarea
                   rows={3}
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
-                  placeholder="Anything to highlight, price change, delay reason, specific material…"
+                  placeholder="Anything to highlight: a price change, a delay, a specific material…"
                   style={{ ...selectStyle, resize: 'vertical', minHeight: 72, fontFamily: 'var(--font-body)' }}
                 />
               </Field>
@@ -855,7 +910,7 @@ function DraftHero({ channel, draft, contact, profile, intent }: any) {
 function SmsHero({ draft, contact }: any) {
   const initials = (contact?.name || '·').trim().split(/\s+/).slice(0, 2).map((s: any) => s.charAt(0).toUpperCase()).join('') || '·'
   const now = new Date()
-  const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const timeStr = timeOfDay(now)
   const dayStr = now.toLocaleDateString([], { weekday: 'short' })
   return (
     <div style={{
@@ -906,7 +961,7 @@ function SmsHero({ draft, contact }: any) {
             {contact?.name || 'New recipient'}
           </div>
           <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: 'var(--v3-text-muted)', fontVariantNumeric: 'tabular-nums' }}>
-            {contact?.phone || 'No phone on file'}
+            {formatPhone(contact?.phone) || 'No phone on file'}
           </div>
         </div>
       </div>

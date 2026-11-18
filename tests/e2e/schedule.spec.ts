@@ -681,3 +681,39 @@ test.describe('views', () => {
     await expect(page).toHaveURL(/\/jobs\/new$/)
   })
 })
+
+// Finding lost-work-4: Add event and Edit event keep what was typed, like
+// every other create screen (D23).
+test.describe('typed words on the event screen', () => {
+  const WORDS = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+  test('Add event keeps the title and where through a reload', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/schedule/new', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.getByLabel('Title').fill('Pour footings, pump at 7')
+    await page.getByLabel('Where').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Title')).toHaveValue('Pour footings, pump at 7')
+    await expect(page.getByLabel('Where')).toHaveValue(WORDS)
+  })
+
+  test('Add event from a job keeps a typed where after Back', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/jobs/c-job1/more', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.getByRole('link', { name: /Schedule an event/ }).click()
+    await page.getByLabel('Where').fill(WORDS)
+    await page.getByRole('button', { name: 'Back' }).click()
+    await page.getByRole('link', { name: /Schedule an event/ }).click()
+    await expect(page.getByLabel('Where')).toHaveValue(WORDS)
+  })
+
+  test('Edit event keeps what was typed through a reload', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/schedule/s1/edit', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByLabel('Title')).toHaveValue(/Pour slab/)
+    await page.getByLabel('Where').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Where')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+  })
+})

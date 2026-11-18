@@ -652,6 +652,74 @@ export function rpcResponse(name, body, tables = TABLES, schema = SCHEMA) {
       const member = (tables.org_members ?? []).find((m) => m.org_id === body.p_org_id && m.user_id === USER.id && !m.revoked_at)
       return json(Boolean(member && ['owner', 'admin', 'manager'].includes(member.role)))
     }
+    case 'fh_company_branding': {
+      // As the function does (20261117161700_company_branding): the
+      // document fields of the company's earliest active owner, for a
+      // member of that company only; anyone else reads null.
+      const members = (tables.org_members ?? []).filter((m) => m.org_id === body.p_org_id && !m.revoked_at)
+      const org = (tables.organizations ?? []).find((o) => o.id === body.p_org_id)
+      if (!org || !members.some((m) => m.user_id === USER.id)) return json(null)
+      const owner = members.filter((m) => m.role === 'owner').sort((a, b) => String(a.joined_at).localeCompare(String(b.joined_at)))[0]
+      const p = (owner && (tables.profiles ?? []).find((r) => r.user_id === owner.user_id)) || {}
+      const text = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+      const fields = ['full_name', 'company_address', 'company_phone', 'company_email', 'company_website', 'logo_url', 'brand_accent_hex',
+        'license_number', 'insured_text', 'payment_link', 'payment_instructions', 'estimate_template', 'warranty_default']
+      return json({
+        org_id: org.id,
+        company_name: text(p.company_name) ?? text(org.name),
+        ...Object.fromEntries(fields.map((f) => [f, p[f] ?? null]))
+      })
+    }
+    case 'fh_merge_client_into': {
+      // As the function does (20261117090100_merge_client_into): moves
+      // what points at each duplicate onto the kept client and deletes
+      // nothing. A row kept once per client (tags, fields, a thread) moves
+      // only when the kept client has none with that key.
+      const keep = body.p_survivor
+      const kept = (tables.fh_clients ?? []).find((c) => c.id === keep)
+      if (!kept) return { status: 400, body: JSON.stringify({ code: 'P0002', message: 'the client to keep was not found' }) }
+      const refuse = (message) => ({ status: 403, body: JSON.stringify({ code: '42501', message }) })
+      if (kept.org_id) {
+        const member = (tables.org_members ?? []).find((m) => m.org_id === kept.org_id && m.user_id === USER.id && !m.revoked_at)
+        if (!member || !['owner', 'admin', 'manager'].includes(member.role)) return refuse('not allowed to merge clients in this company')
+      } else if (kept.user_id !== USER.id) {
+        return refuse('not allowed to merge this client')
+      }
+      // The function raises inside one transaction, so a refused duplicate
+      // moves nothing at all: every duplicate is checked before any row moves.
+      for (const dup of body.p_duplicates ?? []) {
+        if (!dup || dup === keep) continue
+        const row = (tables.fh_clients ?? []).find((c) => c.id === dup)
+        if (!row) return { status: 400, body: JSON.stringify({ code: 'P0002', message: 'a duplicate was not found' }) }
+        if ((row.org_id ?? null) !== (kept.org_id ?? null) || (!kept.org_id && row.user_id !== kept.user_id)) {
+          return refuse('clients from different companies cannot be merged')
+        }
+      }
+      const counted = { fh_contacts: 'jobs', fh_leads: 'leads', fh_quotes: 'quotes', fh_invoices: 'invoices' }
+      const moved = { jobs: 0, leads: 0, quotes: 0, invoices: 0 }
+      const plain = ['fh_contacts', 'fh_leads', 'fh_quotes', 'fh_invoices', 'fh_follow_ups', 'fh_public_links', 'fh_selections', 'fh_appointments',
+        'fh_reviews', 'fh_review_requests', 'fh_messages', 'fh_events', 'fh_outbox', 'fh_agent_runs', 'fh_workflow_runs', 'fh_form_submissions']
+      const byKey = { fh_client_tags: 'tag', fh_client_fields: 'key', fh_campaign_recipients: 'campaign_id', fh_conversations: null, fh_consent: null, fh_client_attribution: null }
+      for (const dup of body.p_duplicates ?? []) {
+        if (!dup || dup === keep) continue
+        for (const table of plain) {
+          for (const row of tables[table] ?? []) {
+            if (row.client_id !== dup) continue
+            row.client_id = keep
+            if (counted[table]) moved[counted[table]] += 1
+          }
+        }
+        for (const [table, key] of Object.entries(byKey)) {
+          const rows = tables[table] ?? []
+          for (const row of rows) {
+            if (row.client_id !== dup) continue
+            const taken = rows.some((k) => k.client_id === keep && (key === null || k[key] === row[key]))
+            if (!taken) row.client_id = keep
+          }
+        }
+      }
+      return json(moved)
+    }
     case 'fh_send_message': {
       const inbox = tables.fh_v_inbox.find((r) => r.client_id === body.p_client_id)
       const conversationId = inbox?.conversation_id ?? tables.fh_messages.find((m) => m.client_id === body.p_client_id)?.conversation_id ?? null

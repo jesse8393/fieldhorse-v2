@@ -689,7 +689,8 @@ test.describe('Reports', () => {
   // The mock's active job stages add up to $45,900. Its leads and quotes
   // live in fh_leads and fh_quotes (Task 15), which feed the funnel and the
   // lead and quote counts, not the pipeline money.
-  const PIPELINE = '$45,900'
+  // The desktop report prints exact figures with cents (formats-4).
+  const PIPELINE = '$45,900.00'
 
   test('while the numbers load nothing reads as zero, empty or not connected', async ({ context, page }, testInfo) => {
     await signIn(context)
@@ -699,11 +700,11 @@ test.describe('Reports', () => {
       await expect.poll(() => read.held.length).toBeGreaterThan(0)
       await holds(async () => {
         await expect(page.getByRole('status').filter({ hasText: 'Loading' }).first()).toBeVisible()
-        await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
+        await expect(page.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toHaveCount(0)
       })
       read.release()
       await expect(page.getByText('Business overview', { exact: true })).toBeVisible()
-      await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
+      await expect(page.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toHaveCount(0)
       return
     }
     await open(page, '/analytics', '[data-build-screen="SnowAnalyticsBuild"]')
@@ -732,7 +733,7 @@ test.describe('Reports', () => {
     await page.goto('/analytics', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     const error = page.getByRole('alert').filter({ hasText: "Couldn't load your reports" })
     await expect(error).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText('Not enough data yet.', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Reports fill in as you add leads, quotes and jobs.', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/\$0 won/)).toHaveCount(0)
     failing.on = false
     await retryFromKeyboard(page, error.getByRole('button', { name: 'Try again' }))
@@ -1106,7 +1107,7 @@ test.describe('Field reports', () => {
       await expect(page.getByText(line)).toHaveCount(0)
     }
     await composer.fill('Rebar delivery moved to Thursday.')
-    await page.getByRole('button', { name: phone ? 'Save Note' : 'Save report', exact: true }).click()
+    await page.getByRole('button', { name: phone ? 'Save note' : 'Save report', exact: true }).click()
     await expect(page.getByText('Note saved')).toBeVisible({ timeout: 15_000 })
     expect(saved).toEqual([expect.objectContaining({ text: 'Rebar delivery moved to Thursday.' })])
     await expect(error).toBeVisible()

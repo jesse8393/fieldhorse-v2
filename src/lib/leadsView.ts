@@ -7,7 +7,7 @@
 
 import type { LeadRow, LeadVisit, QuoteRow } from './queries.ts'
 import type { ChipTone } from '../components/fh/Chip.tsx'
-import { parseDateOnly } from './dates.ts'
+import { parseDateOnly, timeOfDay } from './dates.ts'
 import { moneyCents } from './format.ts'
 import { recordRoute } from './records.ts'
 import type { JobsRowView } from './jobsList.ts'
@@ -58,9 +58,9 @@ export function visitDay(at: Date): string {
   return `${WEEKDAYS[at.getDay()]}, ${MONTHS[at.getMonth()]} ${at.getDate()}`
 }
 
-/** "9:00 AM" for a visit, in the phone's zone. */
+/** "9:00 am" for a visit, in the phone's zone. */
 export function visitTime(at: Date): string {
-  return at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return timeOfDay(at)
 }
 
 /** "Follow up Oct 9", or "Follow up today", or null without a date. */

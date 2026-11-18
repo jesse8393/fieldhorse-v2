@@ -28,9 +28,11 @@ export type JobHeaderPhoneProps = {
   /** Opens the job's More screen; omit to hide the more button. */
   onMore?: () => void
   onOpenPhotos: () => void
+  /** Where the job's phone and address are edited; omit when this person cannot edit the job. */
+  editHref?: string
 }
 
-export default function JobHeaderPhone({ contact, photos, money, backLabel, onBack, onMore, onOpenPhotos }: JobHeaderPhoneProps) {
+export default function JobHeaderPhone({ contact, photos, money, backLabel, onBack, onMore, onOpenPhotos, editHref }: JobHeaderPhoneProps) {
 
   const name = String(contact?.name || '').trim()
   const title = String(contact?.job_title || '').trim() || name || 'Untitled job'
@@ -64,20 +66,24 @@ export default function JobHeaderPhone({ contact, photos, money, backLabel, onBa
 
       <div className="fh-job-contact-actions">
         <ul className="fhj-quick" aria-label="Quick actions">
+          {/* With nothing on file the tile says so in words, and opens the
+              job's details to add it for someone who may edit the job. */}
           <li>
-            <QuickAction icon={Phone} label="Call" href={phone ? `tel:${phone}` : undefined} aria-label={phone ? `Call ${who}` : 'Call, no phone on file'} />
+            {phone ? (
+              <QuickAction icon={Phone} label="Call" href={`tel:${phone}`} aria-label={`Call ${who}`} />
+            ) : (
+              <QuickAction icon={Phone} label={editHref ? 'Add phone' : 'No phone'} href={editHref} aria-label={editHref ? `Add a phone number for ${who}` : 'Call, no phone on file'} />
+            )}
           </li>
           <li>
             <QuickAction icon={MessageSquare} label="Message" href={`/compose?contact=${encodeURIComponent(contact.id)}&channel=${contact?.email || !phone ? 'email' : 'sms'}`} aria-label={`Message ${who}`} />
           </li>
           <li>
-            <QuickAction
-              icon={Navigation}
-              label="Navigate"
-              href={address ? navigateHrefHere(address) : undefined}
-              external
-              aria-label={address ? `Navigate to ${address}` : 'Navigate, no address on file'}
-            />
+            {address ? (
+              <QuickAction icon={Navigation} label="Navigate" href={navigateHrefHere(address)} external aria-label={`Navigate to ${address}`} />
+            ) : (
+              <QuickAction icon={Navigation} label={editHref ? 'Add address' : 'No address'} href={editHref} aria-label={editHref ? 'Add the job site address' : 'Navigate, no address on file'} />
+            )}
           </li>
           <li>
             <QuickAction

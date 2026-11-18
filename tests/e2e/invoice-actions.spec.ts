@@ -1,8 +1,12 @@
 import { readFileSync } from 'node:fs'
-import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { expect, test, type BrowserContext, type Page, type Request } from '@playwright/test'
 import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
+import { FAIL, expectPlain, failRest } from './helpers/rawErrors.ts'
+import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
+import { documentSendKey } from '../../netlify/functions/lib/email.js'
+import { NOW as FORMATS_NOW, TABLES as FORMATS_TABLES, contact as formatsContact, invoice as formatsInvoice } from './helpers/formatsSeed.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -451,6 +455,68 @@ test("Email on the job's money view goes to the client's current email", async (
   expect(sends[0].recipient_email).toBe('jeff@roy.com')
 })
 
+// raw-errors-7: a refused send showed the provider's English, its HTTP code
+// and web address; a send after the sign in ran out showed invalid_token.
+test('a refused send says in plain words that the email did not go out', async ({ page, context }) => {
+  await installShedInvoice(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+  let answer: { status: number; json: object } = { status: 502, json: { error: 'send_failed', provider_status: 403, detail: 'The gmail.com domain is not verified. Please, add and verify your domain on https://resend.com/domains' } }
+  await context.route('**/api/send-invoice', (route) => route.fulfill(answer))
+  await openInvoice(page, 'inv-1')
+  const toasts = page.locator('[data-sonner-toaster]')
+  await action(page, 'Resend').click()
+  await expectPlain(toasts, 'The email did not go out. Try again, or download the PDF and send it yourself.')
+  await expect(page.getByText(/resend\.com|gmail\.com/)).toHaveCount(0)
+  answer = { status: 401, json: { error: 'invalid_token' } }
+  await action(page, 'Resend').click()
+  await expectPlain(toasts, 'Your sign in ran out. Sign in again, then try again.')
+})
+
+// raw-errors-13: the job's money view told the owner to add Resend keys in
+// Netlify.
+test("Email on the job's money view with no email sender says what to do", async ({ page, context }) => {
+  await installShedInvoice(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+  await context.route('**/api/send-invoice', (route) => route.fulfill({ status: 503, json: { error: 'sender_not_configured', message: 'Email sender is not configured yet.' } }))
+  await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const email = page.getByRole('button', { name: 'Email', exact: true })
+  await expect(email).toBeVisible({ timeout: 30_000 })
+  await email.click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'Downloaded the PDF so you can email it manually.')
+})
+
+// raw-errors-6: Void refused by the database showed the policy's words.
+test('a refused Void says so in plain words', async ({ page, context }) => {
+  await installShedInvoice(context)
+  await failRest(context, 'fh_invoices', 'PATCH', FAIL.rls('fh_invoices'))
+  await openInvoice(page, 'inv-1')
+  await page.getByRole('button', { name: /^void$/i }).click()
+  await page.waitForTimeout(700)
+  await page.getByRole('button', { name: /tap again/i }).click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'Your role does not allow this. Ask an owner or admin.')
+})
+
+// raw-errors-4: a payment on no signal said "TypeError: Failed to fetch",
+// and after the sign in ran out it said "JWT expired".
+test('a payment on the invoice with no signal or a lapsed sign in says so in plain words', async ({ page, context }) => {
+  await installShedInvoice(context)
+  let answer: 'drop' | 'jwt' = 'drop'
+  await context.route((url) => url.pathname === '/rest/v1/fh_payments', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return answer === 'drop' ? route.abort('failed') : route.fulfill(FAIL.jwt())
+  })
+  await page.goto('/invoices/inv-1/payment', { waitUntil: 'domcontentloaded' })
+  const amount = page.getByLabel('Amount')
+  await expect(amount).toBeVisible({ timeout: 30_000 })
+  await amount.fill('500')
+  const toasts = page.locator('[data-sonner-toaster]')
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expectPlain(toasts, 'No signal right now. Your work is still here, so try again when the signal is back.')
+  answer = 'jwt'
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expectPlain(toasts, 'Your sign in ran out. Sign in again, then try again.')
+})
+
 test("emailing a draw from the job's invoices goes to the client's current email", async ({ page, context }) => {
   await installShedInvoice(context)
   const sends = await captureInvoiceSends(context)
@@ -815,4 +881,283 @@ test('the remind screen keeps its intro and facts in the centred column', async 
     .map((sel) => Math.round(document.querySelector(sel)!.getBoundingClientRect().left)))
   expect(lefts[0]).toBe(lefts[2])
   expect(lefts[1]).toBe(lefts[2])
+})
+
+// An invoice's email kept its busy state on the screen that started it.
+// Leave the job's money view while Email is still going out on a weak
+// signal, or open the same invoice from another screen, and Send was free
+// again: one more tap emailed the customer the same invoice twice. Every
+// screen that sends an invoice now reads one app wide list of sends.
+test.describe('an invoice email going out is busy on every screen', () => {
+  async function slowInvoiceSends(context: BrowserContext) {
+    await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+    const sends = postsTo(context, '/api/send-invoice')
+    // A weak signal: the send takes 6 seconds to answer.
+    await holdPosts(context, '**/api/send-invoice', 6000, () => ({ status: 200, json: { ok: true } }))
+    return sends
+  }
+
+  async function emailFromJobMoney(page: Page, sends: Request[]) {
+    await page.goto('/jobs/c-job2?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    const email = page.getByRole('button', { name: /^(Email|Sending…)$/ })
+    await expect(email).toBeEnabled({ timeout: 30_000 })
+    await email.click()
+    await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  }
+
+  test('Resend on the invoice screen waits for the job money view', async ({ page, context }) => {
+    await signIn(context)
+    const sends = await slowInvoiceSends(context)
+    await emailFromJobMoney(page, sends)
+    await goInApp(page, '/invoices/inv1')
+    const resend = page.locator('.fhinv-actions').getByRole('button', { name: /^(Resend|Send)$/ })
+    await expect(resend).toBeVisible({ timeout: 30_000 })
+    const busy = await resend.getAttribute('aria-busy')
+    await resend.click({ force: true })
+    await page.waitForTimeout(1500)
+    expect(sends.map((r) => r.postDataJSON()?.invoice_id), 'one invoice, one email').toEqual(['inv1'])
+    expect(busy, 'Resend shows the email going out').toBe('true')
+  })
+
+  test('the job money view still shows Email busy after leaving and coming back', async ({ page, context }) => {
+    await signIn(context)
+    const sends = await slowInvoiceSends(context)
+    await emailFromJobMoney(page, sends)
+    await goInApp(page, '/jobs/c-job2?tab=overview')
+    await page.waitForTimeout(800)
+    await goInApp(page, '/jobs/c-job2?tab=financials')
+    const again = page.getByRole('button', { name: /^(Email|Sending…)$/ })
+    await expect(again).toBeVisible({ timeout: 30_000 })
+    const disabled = await again.isDisabled()
+    await again.click({ force: true })
+    await page.waitForTimeout(1500)
+    expect(sends.length, 'one invoice, one email').toBe(1)
+    expect(disabled, 'Email shows the email going out').toBe(true)
+  })
+
+  test("Email draw to client waits for the job money view's email of the same invoice", async ({ page, context }) => {
+    await signIn(context)
+    const sends = await slowInvoiceSends(context)
+    await emailFromJobMoney(page, sends)
+    await goInApp(page, '/jobs/c-job2?tab=draws')
+    const row = page.locator('.fh-draws-row').filter({ hasText: 'Progress draw 1' })
+    const draw = row.getByRole('button', { name: 'Email draw to client' })
+    await expect(draw).toBeVisible({ timeout: 30_000 })
+    const disabled = await draw.isDisabled()
+    await draw.click({ force: true })
+    await page.waitForTimeout(1500)
+    expect(sends.map((r) => r.postDataJSON()?.invoice_id), 'one invoice, one email').toEqual(['inv1'])
+    expect(disabled, 'the draw shows its email going out').toBe(true)
+  })
+})
+
+// Email on a job with nothing billed makes a Balance due invoice for the
+// whole balance and emails it. On a weak signal, leaving the tab and coming
+// back freed Email while the new invoice was still saving, and a second tap
+// made a second Balance due for the same $33,100. The send is now busy app
+// wide, and the new invoice's id is made once per send, so a retry after a
+// lost answer finds the first row instead of adding another.
+test.describe('Email on a job with nothing billed makes one Balance due', () => {
+  const unbilled = { fh_contacts: [{ ...shedJob(), client_id: 'cl-1' }], fh_invoices: [], fh_payments: [], fh_change_orders: [] }
+  const created = (body: Record<string, unknown>, n: number) => ({ id: `inv-new-${n}`, org_id: 'org-1', sequence_number: n, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), issued_at: null, ...body })
+
+  async function emailButton(page: Page) {
+    const email = page.locator('.fh-job-money__actions button').first()
+    await expect(email).toBeEnabled({ timeout: 30_000 })
+    return email
+  }
+
+  test('leaving and coming back while it saves does not make a second invoice', async ({ page, context }) => {
+    test.setTimeout(90_000)
+    await signIn(context, { tables: unbilled })
+    await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa.pdf' } }))
+    const inserts = postsTo(context, '/rest/v1/fh_invoices')
+    const sends = postsTo(context, '/api/send-invoice')
+    // A weak signal: the new invoice takes 4 seconds to save.
+    await holdPosts(context, '**/rest/v1/fh_invoices*', 4000, (n, request) => ({ status: 201, json: created(request.postDataJSON(), n) }))
+    await context.route('**/api/send-invoice', (route) => route.fulfill({ status: 200, json: { ok: true } }))
+    await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await (await emailButton(page)).click()
+    await expect.poll(() => inserts.length, { timeout: 20_000 }).toBe(1)
+    await goInApp(page, '/jobs/c-job1?tab=overview')
+    await page.waitForTimeout(600)
+    await goInApp(page, '/jobs/c-job1?tab=financials')
+    const again = page.locator('.fh-job-money__actions button').first()
+    await expect(again).toBeVisible({ timeout: 30_000 })
+    const busy = await again.isDisabled()
+    await again.click({ force: true })
+    await expect.poll(() => sends.length, { timeout: 20_000 }).toBe(1)
+    await page.waitForTimeout(1500)
+    expect(inserts.map((r) => `${r.postDataJSON()?.title} $${r.postDataJSON()?.amount}`), 'one balance, one invoice').toEqual(['Balance due $33100'])
+    expect(sends.length, 'one invoice, one email').toBe(1)
+    expect(busy, 'Email shows the send going out').toBe(true)
+  })
+
+  test('a retry after the save lost its answer sends the same invoice id', async ({ page, context }) => {
+    test.setTimeout(90_000)
+    await signIn(context, { tables: unbilled })
+    await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa.pdf' } }))
+    const ids: string[] = []
+    await context.route('**/rest/v1/fh_invoices*', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      const body = route.request().postDataJSON()
+      ids.push(body.id)
+      // The first save's answer never arrives.
+      if (ids.length === 1) return route.abort('failed')
+      return route.fulfill({ status: 201, json: created(body, ids.length) })
+    })
+    const sends = postsTo(context, '/api/send-invoice')
+    await context.route('**/api/send-invoice', (route) => route.fulfill({ status: 200, json: { ok: true } }))
+    await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    await (await emailButton(page)).click()
+    await expect(page.getByText("Couldn't send invoice", { exact: true })).toBeVisible({ timeout: 20_000 })
+    await (await emailButton(page)).click()
+    await expect.poll(() => sends.length, { timeout: 20_000 }).toBe(1)
+    expect(ids).toHaveLength(2)
+    expect(ids[0], 'the new invoice has a client made id').toMatch(/^[0-9a-f-]{36}$/)
+    expect(ids[1], 'the retry is the same invoice').toBe(ids[0])
+  })
+})
+
+// A double tap on a change order's Send for signature, while the link was
+// still being made, minted two live approval links for one change order,
+// and a double tap on Approve wrote it twice. Both take one tap now.
+test.describe('a change order takes one tap', () => {
+  const co = { id: 'co-1', org_id: 'org-1', contact_id: 'c-job1', user_id: 'qa-user-1', sequence_number: 1, title: 'Extra footing', description: null, amount: 1200, status: 'draft', approval_method: null, approved_by_name: null, approved_at: null, created_at: '2026-11-10T15:00:00.000Z' }
+  const tables = { fh_contacts: [shedJob()], fh_invoices: [], fh_payments: [], fh_change_orders: [co], fh_public_links: [] }
+
+  test.beforeEach(async ({ context }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'touch taps')
+    await context.addInitScript(() => {
+      // The clipboard path, quietly, as a phone without a share sheet.
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true })
+    })
+  })
+
+  test('Send for signature makes one approval link', async ({ page, context }) => {
+    await signIn(context, { tables })
+    const links = postsTo(context, '/rest/v1/fh_public_links')
+    await holdPosts(context, '**/rest/v1/fh_public_links*', 1500, (n) => ({ status: 201, json: { id: `pl-${n}`, token: `tok${n}`, kind: 'change_order' } }))
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    const sign = page.getByRole('button', { name: 'Send for signature', exact: true })
+    await expect(sign).toBeVisible({ timeout: 30_000 })
+    await twoTaps(page, sign)
+    await expect(page.getByText('Approval link copied', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(1000)
+    expect(links.length, 'one tap, one approval link').toBe(1)
+  })
+
+  test('Approve writes once', async ({ page, context }) => {
+    await signIn(context, { tables })
+    const writes: string[] = []
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_change_orders'), async (route) => {
+      const method = route.request().method()
+      if (method !== 'PATCH' && method !== 'POST') return route.fallback()
+      writes.push(method)
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      return route.fulfill({ status: 200, json: { ...co, status: 'approved', approval_method: 'verbal', approved_at: new Date().toISOString() } })
+    })
+    await page.goto('/jobs/c-job1?tab=change_orders', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+    const approve = page.getByRole('button', { name: 'Approve change order', exact: true })
+    await expect(approve).toBeVisible({ timeout: 30_000 })
+    await twoTaps(page, approve)
+    await expect(page.getByText('Change order updated', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(1000)
+    expect(writes.length, 'one tap, one write').toBe(1)
+  })
+})
+
+// When the email went out but the invoice could not be marked sent, the
+// server answers "Try again to record it. The customer will not get a
+// second email." The retry built and uploaded a new PDF, so the provider
+// key, which followed the PDF's path, was new and the customer got a second
+// email. A retry now carries the same send id and the same PDF, so the
+// provider sees the same email and sends nothing new.
+test('Resend after "the customer will not get a second email" repeats the same send', async ({ page, context }) => {
+  await signIn(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/i.pdf' } }))
+  const sends = postsTo(context, '/api/send-invoice')
+  const notSaved = 'The invoice was sent, but it could not be marked as sent. Try again to record it. The customer will not get a second email.'
+  let n = 0
+  await context.route('**/api/send-invoice', (route) => {
+    n += 1
+    return n === 1
+      ? route.fulfill({ status: 500, json: { error: 'status_not_saved', email_sent: true, email_id: 're_1', message: notSaved, detail: notSaved } })
+      : route.fulfill({ status: 200, json: { ok: true } })
+  })
+  await openInvoice(page)
+  const resend = action(page, 'Resend')
+  await resend.click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'second email' })).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(1500) // past the settle window
+  await resend.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(2)
+  const [first, retry] = sends.map((r) => r.postDataJSON())
+  const key = (b: Record<string, unknown>) => documentSendKey('send-invoice', `invoice:${b.invoice_id}`, b, String(b.recipient_email).toLowerCase().trim())
+  expect(key(retry), 'the retry the message invites carries the same provider key').toBe(key(first))
+  expect(retry.storage_path, 'and the same PDF').toBe(first.storage_path)
+})
+
+// formats-1: the app names an invoice by the number its PDF and customer
+// link print, PCC-2D3E-01, on the invoice page, the job's Invoices tab,
+// Activity and Search, and typing that number in Search finds it.
+test('the app names an invoice by the number the customer sees', async ({ context, page, isMobile }) => {
+  const OWING = '1c8d2e3f-4051-4b6c-9d7e-8f9a0b1c2d3e'
+  const INV = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+  const job = formatsContact({ id: OWING, stage: 'job', name: 'Harold Wickham', job_title: 'Back patio', amount: 4200.75 })
+  const bill = formatsInvoice({ id: INV, contact_id: OWING, title: 'Final', amount: 4200.75, status: 'sent', sequence_number: 1, issued_at: '2026-11-10T05:30:00Z', created_at: '2026-11-10T05:30:00Z', due_at: '2026-11-25T05:59:59.999Z' })
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_contacts: [job], fh_invoices: [bill], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto(`/invoices/${INV}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await page.goto(`/jobs/${OWING}?tab=draws`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Draw #1/)).toHaveCount(0)
+  if (!isMobile) {
+    // The desktop job page's documents panel names it the same way.
+    await page.goto(`/jobs/${OWING}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const panel = page.locator('.fhd-sec').filter({ has: page.getByRole('heading', { name: 'Documents' }) })
+    await expect(panel.getByText('PCC-2D3E-01, Final', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(panel.getByText(/Invoice 1/)).toHaveCount(0)
+  }
+  await page.goto('/activity', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await expect(page.getByText(/PCC-2D3E-01 sent: Final/).first()).toBeVisible({ timeout: 30_000 })
+  await page.goto('/search', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByPlaceholder(/Jobs, clients/).fill('PCC-2D3E-01')
+  await expect(page.getByText(/PCC-2D3E-01/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Final', { exact: true }).first()).toBeVisible()
+})
+
+// formats-1: an untitled invoice on the customer page's Projects tab reads
+// by its printed number, not "Invoice 1".
+test('the customer page names an untitled invoice by its printed number', async ({ context, page }) => {
+  const OWING = '1c8d2e3f-4051-4b6c-9d7e-8f9a0b1c2d3e'
+  const job = formatsContact({ id: OWING, stage: 'job', name: 'Harold Wickham', job_title: 'Back patio', amount: 4200.75 })
+  const bill = formatsInvoice({ id: '7c9e6679-7425-40de-944b-e07fc1f90ae7', contact_id: OWING, title: null, amount: 4200.75, status: 'sent', sequence_number: 1 })
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_contacts: [job], fh_invoices: [bill], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await page.goto('/clients/cl-h', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  await page.getByRole('tab', { name: /^Projects/ }).or(page.getByRole('button', { name: /^Projects/ })).filter({ visible: true }).first().click({ timeout: 30_000 })
+  await expect(page.getByText('PCC-2D3E-01', { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/^Invoice 1$/)).toHaveCount(0)
+})
+
+// Finding lost-work-5: Edit invoice keeps what was typed through a reload
+// and Back, and restores it over the saved invoice.
+test('Edit invoice keeps a typed description through a reload and notes through Back', async ({ page }) => {
+  const words = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+  await page.goto('/invoices/inv1/edit', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await page.getByLabel('Description, shows on the invoice').fill(words)
+  await page.reload()
+  await expect(page.getByLabel('Description, shows on the invoice')).toHaveValue(words)
+  await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+
+  await openInvoice(page)
+  await page.getByRole('link', { name: 'Edit', exact: true }).click()
+  await page.getByLabel('Notes').fill('Net 15, thank you')
+  await page.getByRole('button', { name: 'Back' }).click()
+  await page.getByRole('link', { name: 'Edit', exact: true }).click()
+  await expect(page.getByLabel('Notes')).toHaveValue('Net 15, thank you')
+  await expect(page.getByLabel('Description, shows on the invoice')).toHaveValue(words)
 })

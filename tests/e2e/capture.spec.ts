@@ -338,6 +338,39 @@ test.describe('capture screen', () => {
     expect(posted[0]).toMatchObject({ contact_id: 'c-job1', category: 'note' })
     expect(await page.evaluate(() => localStorage.getItem('fh:capture-outbox'))).toBeNull()
   })
+
+  // A payment filed through Capture whose first save lost its answer. Save
+  // came back for a retry with a new payment id, so a first save that did
+  // land stayed and the retry recorded the payment twice. The id is now
+  // made once per confirmed capture and kept for every retry.
+  test('a payment saved again after a lost answer keeps its id', async ({ context, page }) => {
+    test.setTimeout(90_000)
+    await signIn(context)
+    await mockModel(page, { kind: 'payment', summary: 'Log a deposit', job_id: 'c-job1', confidence: 0.9, amount: 2500, method: 'check', payment_kind: 'deposit' })
+    const ids: string[] = []
+    await context.route('**/rest/v1/fh_payments*', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      const body = route.request().postDataJSON()
+      ids.push(Array.isArray(body) ? body[0]?.id : body?.id)
+      // The first save's answer never arrives (weak signal).
+      if (ids.length === 1) return route.abort('failed')
+      return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' })
+    })
+    await open(page, '/')
+    await openOnJob(page, 'c-job1')
+    const screen = captureScreen(page)
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill('Got a 2500 deposit check')
+    await screen.getByRole('button', { name: 'File it' }).click()
+    const save = screen.getByRole('button', { name: 'Save', exact: true })
+    await expect(save).toBeEnabled({ timeout: 30_000 })
+    await save.click()
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: "Couldn't save that" })).toBeVisible({ timeout: 20_000 })
+    await expect(save).toBeEnabled({ timeout: 10_000 })
+    await save.click()
+    await expect.poll(() => ids.length, { timeout: 20_000 }).toBe(2)
+    expect(ids[0], 'the payment has a client made id').toMatch(/^[0-9a-f-]{36}$/)
+    expect(ids[1], 'a retried save is the same payment').toBe(ids[0])
+  })
 })
 
 test.describe('desktop capture', () => {
@@ -411,5 +444,44 @@ test.describe('desktop capture', () => {
     await create.click()
     await expect(page).toHaveURL(/\/leads\/new$/)
     await expect(page.getByRole('heading', { level: 1, name: 'New lead', exact: true })).toBeVisible()
+  })
+})
+
+// Finding lost-work-3: capture never loses words, so a reload or the
+// phone's Back (which skips the on screen guard) keeps what was typed.
+test.describe('capture keeps its words', () => {
+  const WORDS = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+  test('a reload keeps what was typed', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/capture')
+    await captureScreen(page).getByRole('textbox', { name: 'Or type it' }).fill(WORDS)
+    await page.reload()
+    await expect(captureScreen(page).getByRole('textbox', { name: 'Or type it' })).toHaveValue(WORDS)
+    await expect(captureScreen(page).getByText('Unsaved changes restored')).toBeVisible()
+  })
+
+  test("the phone's Back and Forward keep what was typed", async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/jobs/c-job1')
+    await page.goto('/capture?job=c-job1', { waitUntil: 'domcontentloaded' })
+    await captureScreen(page).getByRole('textbox', { name: 'Or type it' }).fill(WORDS)
+    await page.goBack()
+    await expect(page).toHaveURL(/\/jobs\/c-job1$/)
+    await page.goForward()
+    await expect(captureScreen(page).getByRole('textbox', { name: 'Or type it' })).toHaveValue(WORDS)
+  })
+
+  test('discarding with the second tap forgets the words', async ({ context, page }) => {
+    await signIn(context)
+    await open(page, '/capture')
+    const screen = captureScreen(page)
+    await screen.getByRole('textbox', { name: 'Or type it' }).fill(WORDS)
+    await screen.getByRole('button', { name: 'Done' }).click()
+    await page.waitForTimeout(600)
+    await screen.getByRole('button', { name: 'Tap again to discard' }).click()
+    await expect(page).not.toHaveURL(/\/capture/)
+    await page.goto('/capture', { waitUntil: 'domcontentloaded' })
+    await expect(captureScreen(page).getByRole('textbox', { name: 'Or type it' })).toHaveValue('')
   })
 })

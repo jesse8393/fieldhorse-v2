@@ -280,3 +280,36 @@ test('deleting a custom trade takes a second tap', async ({ page, context }) => 
   await expect.poll(() => deletes.length).toBe(1)
   await expect(page.getByText('Trade deleted', { exact: true })).toBeVisible()
 })
+
+// ai-copy-3: the document and payment hints read as sentences, not as the
+// comma splices a dash swap left behind.
+test('document and payment hints read as sentences', async ({ page, context }) => {
+  await signIn(context)
+  let shown = ''
+  for (const section of ['documents', 'payments']) {
+    await page.goto(`/settings?section=${section}`)
+    await expect(page.locator('#fh-main h1').first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(section === 'documents' ? 'Company address' : 'Payment link', { exact: true }).first()).toBeVisible()
+    shown += ' ' + (await page.locator('body').innerText()).replace(/\s+/g, ' ')
+  }
+  expect(shown).toContain("We don't touch the money. It goes straight to your account.")
+  for (const splice of [
+    'to get started, everything else is optional',
+    'One line or several, used on cover pages.',
+    'Paste a payment link you already use, Venmo',
+    "We don't touch the money, it goes",
+    'Shown under the button, checks payable to'
+  ]) expect(shown).not.toContain(splice)
+})
+
+// Finding lost-work-12: a rate typed and not saved yet stays through a
+// reload, ready to save.
+test('a rate being typed survives a reload', async ({ page, context }) => {
+  await signInWithPersistedSettings(context)
+  await page.goto('/settings#rates')
+  const concrete = () => page.getByRole('region', { name: 'Your rates.' }).getByRole('group', { name: 'Concrete rates', exact: true })
+  await concrete().getByRole('spinbutton', { name: 'Concrete low price ($)', exact: true }).fill('9.75')
+  await page.reload()
+  await expect(concrete().getByRole('spinbutton', { name: 'Concrete low price ($)', exact: true })).toHaveValue('9.75')
+  await expect(concrete().getByRole('button', { name: 'Save Concrete rate', exact: true })).toBeEnabled()
+})

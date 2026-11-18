@@ -1,6 +1,6 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 const SnowClientDetailBuild = lazy(() => import('../components/desktop/SnowClientDetailBuild.tsx'))
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
@@ -20,33 +20,33 @@ import { supabase } from '../lib/supabase.ts'
 import { useClientDetail, useInvalidateClientDetail, useInvalidateClients } from '../lib/queries.ts'
 import { homeDashboardKey } from '../lib/homeDashboard.ts'
 import { useOrgScope } from '../lib/orgScope.ts'
+import { useDocumentCompanyName } from '../lib/companyBranding.ts'
+import { invoiceReference } from '../lib/invoiceReference.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
 import { recordRoute, type RecordKind } from '../lib/records.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
+import { draftWaiting } from '../lib/drafts.ts'
+import { useEditDraft } from '../lib/useEditDraft.ts'
+import DraftRestored from '../components/DraftRestored.tsx'
 import { clientDeleteBlockers, describeDeleteBlockers } from '../lib/clients.ts'
-import { gatherStatement } from '../lib/statement.ts'
+import { gatherStatement, statementMoneyQuery } from '../lib/statement.ts'
 import { rollupJobs } from '../lib/rollups.ts'
 // Apple Maps on iPhone and iPad, Google Maps everywhere else (S25).
 import { navigateHrefHere } from '../lib/todayView.ts'
 import { composeClientTimeline, type TimelineEvent } from '../lib/clientTimeline.ts'
+import { plainError } from '../lib/serviceErrors.ts'
+import { moneyCents } from '../lib/format.ts'
+import { formatPhone } from '../lib/utils.ts'
+import { useFitWidth } from '../lib/useFitWidth.ts'
 
-function money(n: any) {
-  const v = Number(n || 0)
-  if (!v) return '$0'
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(v >= 10_000_000 ? 1 : 2)}M`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(v >= 10_000 ? 0 : 1)}K`
-  return `$${Math.round(v).toLocaleString()}`
-}
+// One customer's money to the cent, the figure Money and the statement
+// show, never "$12K" (formats-4).
+const money = moneyCents
 
-function fmtPhone(n: any) {
-  if (!n) return ''
-  const digits = String(n).replace(/\D/g, '')
-  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-  if (digits.length === 11 && digits.startsWith('1')) return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`
-  return n
-}
+// The one phone formatter (formats-10).
+const fmtPhone = formatPhone
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -61,6 +61,7 @@ export default function ClientDetail() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const orgId = useOrgScope(user?.id)
+  const companyName = useDocumentCompanyName(orgId)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -82,7 +83,12 @@ export default function ClientDetail() {
   const [tab, setTab] = useState('overview')
   // Every row on the Projects tab opens its own record (D53).
   const openRecord = (kind: RecordKind, recordId: string) => navigate(recordRoute(kind, recordId))
+  // An edit left open with changes in it opens again (D23), when those
+  // changes began from the customer as saved now.
   const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === 'contact')
+  useEffect(() => {
+    if (client && !isEditing && draftWaiting(clientEditKind(client.id), clientEditBase(client))) setIsEditing(true)
+  }, [client]) // eslint-disable-line react-hooks/exhaustive-deps
   // Deleting the client takes a second tap on the same button (D57).
   const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
@@ -115,10 +121,27 @@ export default function ClientDetail() {
   // so the "Statement · $X across N properties" button always agrees
   // with the document it opens (previously the button showed
   // `outstanding`/`activeCount`, which use different stage sets and could
-  // disagree with the generated statement).
+  // disagree with the generated statement). It reads the statement's own
+  // invoices and payments through the same query, so the total is what is
+  // owed on sent invoices, never the contract less what was paid
+  // (formats-5). Until that read is in, the button waits.
+  const statementJobIds = useMemo(() => jobs.map((j: any) => j.id as string), [jobs])
+  const statementMoney = useQuery({
+    ...statementMoneyQuery(id, statementJobIds),
+    enabled: !!id && !!client
+  })
   const statementSummary = useMemo(
-    () => gatherStatement(jobs as any, payments as any, changeOrders as any),
-    [jobs, payments, changeOrders]
+    () => statementMoney.data
+      ? gatherStatement(jobs as any, statementMoney.data.payments, changeOrders as any, { invoices: statementMoney.data.invoices })
+      : { lines: [], totalDue: 0, notInvoiced: [], notInvoicedTotal: 0 },
+    [jobs, changeOrders, statementMoney.data]
+  )
+  // The control stays one tap away while the total loads or if it cannot be
+  // read, and for work not yet invoiced; it names a figure only once the
+  // read is in and something is owed on sent invoices.
+  const statementTotalKnown = !!statementMoney.data && statementSummary.totalDue > 0
+  const showStatement = jobs.length > 0 && (
+    !statementMoney.data || statementSummary.totalDue > 0 || statementSummary.notInvoicedTotal > 0
   )
 
   // The first tap checks what would be lost and arms the button, the
@@ -139,7 +162,7 @@ export default function ClientDetail() {
       return true
     } catch (e) {
       hapticError()
-      toastError("Couldn't delete", e instanceof Error ? e.message : 'Check your connection and try again.')
+      toastError("Couldn't delete", plainError(e, 'Check your connection and try again.'))
       return true
     }
   }
@@ -176,8 +199,8 @@ export default function ClientDetail() {
     const { data, error } = await supabase.from('fh_clients').update(patch).eq('id', client.id).select('id')
     if (error || !data?.length) {
       hapticError()
-      toastError("Couldn't save", error?.message || 'This client may have been removed. Refresh and try again.')
-      return
+      toastError("Couldn't save", plainError(error, 'This client may have been removed. Refresh and try again.'))
+      return false
     }
     await fetchClient()
     void invalidateClients()
@@ -186,6 +209,7 @@ export default function ClientDetail() {
       void queryClient.invalidateQueries({ queryKey: homeDashboardKey(user.id, orgId) })
     }
     setIsEditing(false)
+    return true
   }
 
   // New for this client (SPEC D58): the New screen, with this client
@@ -252,7 +276,7 @@ export default function ClientDetail() {
         <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
       )}
       {tab === 'projects' && (
-        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
+        <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} clientId={client?.id} companyName={companyName} onOpen={openRecord} />
       )}
       {tab === 'files' && <FilesList rows={files} />}
       {tab === 'notes' && <NotesList notes={notes} />}
@@ -277,7 +301,7 @@ export default function ClientDetail() {
           onDelete={() => { void requestDelete() }}
           deleteArmed={deleteTap.armed}
           onNewDeal={openNew}
-          onStatement={statementSummary.totalDue > 0 ? openStatement : undefined}
+          onStatement={showStatement ? openStatement : undefined}
           isEditing={isEditing}
         >
           {tabBody}
@@ -391,13 +415,16 @@ export default function ClientDetail() {
             </div>
           </div>
 
-          {/* Metrics row, surfaces lifetime / outstanding / active */}
+          {/* Metrics row, surfaces lifetime / outstanding / active. Equal
+              share of the row while each figure fits. The amounts carry
+              cents, so a figure that does not fit beside the others moves
+              to the next line instead of running into its neighbour. */}
           {(lifetime > 0 || outstanding > 0 || activeCount > 0) && (
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              alignItems: 'end',
-              gap: 12,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-end',
+              gap: '12px 24px',
               marginTop: 12,
               paddingTop: 12,
               borderTop: '1px solid var(--v3-border)'
@@ -468,7 +495,7 @@ export default function ClientDetail() {
         {/* STATEMENT, roll every open invoice across all this client's
             properties into one document. Only meaningful when there's a
             balance, so it stays hidden otherwise. */}
-        {statementSummary.totalDue > 0 && (
+        {showStatement && (
           <motion.button
             type="button"
             whileTap={{ scale: 0.99 }}
@@ -484,7 +511,9 @@ export default function ClientDetail() {
             }}
           >
             <Receipt size={16} strokeWidth={2.2} aria-hidden="true" />
-            Statement · {money(statementSummary.totalDue)} across {statementSummary.lines.length} {statementSummary.lines.length === 1 ? 'property' : 'properties'}
+            {statementTotalKnown
+              ? `Statement · ${money(statementSummary.totalDue)} across ${statementSummary.lines.length} ${statementSummary.lines.length === 1 ? 'property' : 'properties'}`
+              : 'Statement'}
           </motion.button>
         )}
       </div>
@@ -509,7 +538,7 @@ export default function ClientDetail() {
           <ClientTimeline jobs={jobs} payments={payments} notes={notes} files={files} onOpen={(jobId: any) => jobId && navigate(`/jobs/${jobId}`)} />
         )}
         {tab === 'projects' && (
-          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} onOpen={openRecord} />
+          <ProjectsList jobs={jobs} leads={leads} quotes={quotes} invoices={invoices} payments={payments} changeOrders={changeOrders} clientId={client?.id} companyName={companyName} onOpen={openRecord} />
         )}
         {tab === 'files' && <FilesList rows={files} />}
         {tab === 'notes' && <NotesList notes={notes} />}
@@ -611,11 +640,22 @@ function ActionTile({ icon: Icon, label, href, external }: any) {
    Job Detail cockpit helper so both detail screens share scale.
    ============================================================ */
 
+// The figure's size in px, the StampNumber scale for the two sizes used here.
+const METRIC_PX: Record<string, number> = { md: 22, lg: 28 }
+
 function CockpitMetric({ label, tone = 'default', size = 'md', children }: any) {
+  // A figure with cents is wide. Each figure takes its own width and moves
+  // to the next line when it does not fit beside the others; a figure too
+  // wide even for a line of its own is scaled down to fit, whole and on
+  // one line, by the same fit to width hook as the money totals.
+  const fitRef = useFitWidth<HTMLDivElement>(String(children ?? ''))
+  const px = METRIC_PX[size] ?? METRIC_PX.md
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 auto', minWidth: 0, maxWidth: '100%' }}>
       <Eyebrow tone={tone === 'gold' ? 'gold' : 'default'}>{label}</Eyebrow>
-      <StampNumber size={size} tone={tone}>{children}</StampNumber>
+      <div ref={fitRef} style={{ whiteSpace: 'nowrap' }}>
+        <StampNumber size={size} tone={tone} style={{ fontSize: `calc(${px}px * var(--fh-fit, 1))` }}>{children}</StampNumber>
+      </div>
     </div>
   )
 }
@@ -754,10 +794,28 @@ function ContactRow({ icon: Icon, label, value, href, multiline, isLast }: any) 
    OverviewEdit, controlled form, v3 surface
    ============================================================ */
 
+const CLIENT_EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
+
+function clientEditKind(id: string | undefined) {
+  return `edit:client:${id}`
+}
+
+/** The edit form as the saved customer fills it: what an edit starts from. */
+function clientEditBase(client: any) {
+  return Object.fromEntries(CLIENT_EDITABLE.map((k) => [k, client[k] ?? null]))
+}
+
 function OverviewEdit({ client, onCommit, onCancel }: any) {
-  const [form, setForm] = useState({ ...client })
+  // What is typed stays on the device until it is saved or cancelled, so a
+  // reload keeps it (D23).
+  const draft = useEditDraft<Record<string, any>>(clientEditKind(client.id), clientEditBase(client))
+  const form = draft.form
   const [saving, setSaving] = useState(false)
-  function set(k: any, v: any) { setForm((f: any) => ({ ...f, [k]: v })) }
+  function set(k: any, v: any) { draft.set(k, v) }
+  function cancel() {
+    draft.discard()
+    onCancel()
+  }
   const fieldStyle: import('react').CSSProperties = {
     width: '100%', boxSizing: 'border-box',
     padding: '12px 12px', borderRadius: 10,
@@ -778,17 +836,17 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
       toastError('Add a name', 'A client needs a name before you can save.')
       return
     }
-    const EDITABLE = ['name', 'company_name', 'phone', 'email', 'address', 'notes']
     const patch: Record<string, any> = {}
-    for (const k of EDITABLE) {
+    for (const k of CLIENT_EDITABLE) {
       const next = form[k]
       const prev = client[k]
       if ((next ?? null) !== (prev ?? null)) patch[k] = next === '' ? null : next
     }
-    if (Object.keys(patch).length === 0) { onCancel(); return }
+    if (Object.keys(patch).length === 0) { cancel(); return }
     setSaving(true)
-    await onCommit(patch)
+    const saved = await onCommit(patch)
     setSaving(false)
+    if (saved) draft.done()
   }
   return (
     <div style={{
@@ -797,6 +855,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
       display: 'flex', flexDirection: 'column', gap: 12,
       margin: '12px 0 24px'
     }}>
+      {draft.restored && <DraftRestored onDiscard={draft.discard} />}
       <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <span style={labelStyle}>Name</span>
         <input style={fieldStyle} value={form.name || ''} onChange={(e) => set('name', e.target.value)} />
@@ -824,7 +883,7 @@ function OverviewEdit({ client, onCommit, onCancel }: any) {
         <textarea rows={4} style={{ ...fieldStyle, resize: 'vertical' }} value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} />
       </label>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginTop: 4 }}>
-        <button type="button" onClick={onCancel} disabled={saving} style={{
+        <button type="button" onClick={cancel} disabled={saving} style={{
           padding: '12px 12px', borderRadius: 10,
           background: 'var(--v3-surface-2)', border: '1px solid var(--v3-border-strong)',
           color: 'var(--v3-text)', fontFamily: 'var(--font-body)',
@@ -1197,7 +1256,7 @@ function RecordRow({ color, title, detail, figure, word, stamp, onOpen }: any) {
    ProjectsList: the client's four kinds of record (D53), Leads,
    Quotes, Jobs and Invoices, each row opening its own screen.
    ============================================================ */
-function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], onOpen }: any) {
+function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments = [], changeOrders = [], clientId, companyName, onOpen }: any) {
   const paidByJob = useMemo(() => {
     const m = new Map()
     for (const p of payments || []) {
@@ -1350,7 +1409,7 @@ function ProjectsList({ jobs, leads = [], quotes = [], invoices = [], payments =
           <RecordRow
             key={inv.id}
             color={stageColor('invoice')}
-            title={inv.title || `Invoice ${inv.sequence_number || ''}`.trim()}
+            title={inv.title || invoiceReference({ ...inv, client_id: inv.client_id || clientId }, companyName)}
             detail={inv.due_at ? `Due ${new Date(inv.due_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}` : null}
             figure={money(inv.amount)}
             word={statusWord(inv.status)}
@@ -1453,7 +1512,7 @@ function FilesList({ rows }: any) {
     const bucket = row.kind === 'photo' ? 'job-photos' : 'job-files'
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(row.storage_path, 60 * 60)
     if (error || !data?.signedUrl) {
-      toastError('Could not open', error?.message || 'Try again')
+      toastError('Could not open', plainError(error, 'Try again.'))
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener')

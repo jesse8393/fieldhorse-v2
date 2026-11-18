@@ -7,7 +7,7 @@ import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { reopen, reopenQuestion } from '../../lib/pipeline.ts'
 import { newRecordRoute, recordRoute } from '../../lib/records.ts'
-import { contractTotals, fetchInvoicesForContact } from '../../lib/invoices.ts'
+import { contractTotals, jobInvoicesKey, readJobInvoices } from '../../lib/invoices.ts'
 import { stageColor, margin, isMovedStage } from '../../lib/stages.ts'
 import { MovedRecordRedirect } from '../../components/MovedRecordRedirect.tsx'
 import { toastSuccess, toastError } from '../../lib/toast.ts'
@@ -20,7 +20,7 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import { Eyebrow } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
-import { tabsForStage, resolveTabForStage, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
+import { tabsForStage, resolveTabForStage, canonicalJobTab, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
 import { tabsForRole, pickVisibleTab } from './lib/jobAccess.ts'
 import OverviewTab from './tabs/Overview.tsx'
 // Lazy, non-default tabs + sections only render
@@ -45,6 +45,7 @@ import { assignedCrewIds, railNotes } from './lib/jobDesktop.ts'
 import JobHeaderPhone, { JobSectionTabs } from './phone/JobHeaderPhone.tsx'
 import JobActionCapsule from './phone/JobActionCapsule.tsx'
 import { useJobPhotos } from './phone/SpineList.tsx'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // Tab fallback for Suspense, replaces fallback={null}, which made tab
 // taps look broken (active state animates, then blank space for the
@@ -89,7 +90,7 @@ type JobActionIntentMeta = {
   title: string
   detail: string
   primaryLabel: string
-  tab: 'overview' | 'financials' | 'change_orders'
+  tab: 'overview' | 'financials' | 'draws' | 'change_orders'
 }
 
 const JOB_ACTION_INTENTS = {
@@ -125,8 +126,10 @@ const JOB_ACTION_INTENTS = {
     eyebrow: 'Collection risk',
     title: 'Invoice past due',
     detail: 'There is an open invoice past its due date. Review the balance and send the customer a reminder.',
-    primaryLabel: 'Open invoice tools',
-    tab: 'financials',
+    // A link Today wrote before it opened the reminder itself: the
+    // Invoices tab lists the bill, which opens its reminder.
+    primaryLabel: 'Open invoices',
+    tab: 'draws',
   },
   change_order_followup: {
     eyebrow: 'Scope control',
@@ -276,14 +279,10 @@ export default function ContactDetail() {
   // them again, and read on every open, since a new invoice is made on
   // its own screen. Unknown until they land, which keeps Invoice this.
   const { data: jobInvoices } = useQuery({
-    queryKey: ['jobDetail', id, 'invoices'],
+    queryKey: jobInvoicesKey(id),
     enabled: !!id && canMoveMoney,
     staleTime: 0,
-    queryFn: async () => {
-      const { data: rows, error } = await fetchInvoicesForContact(id as string)
-      if (error) throw error
-      return rows
-    }
+    queryFn: () => readJobInvoices(id as string)
   })
   const routeHome = location.pathname.startsWith('/leads')
     ? '/leads'
@@ -320,7 +319,7 @@ export default function ContactDetail() {
   const visibleTabs = tabsForRole(TOP_TABS.filter((t) => stageTabs.includes(t.id as any)), canSeeMoney)
   // Overview is home for every stage, and the param the URL omits.
   const defaultTab = 'overview'
-  const urlTab = (tabParam && VALID_TABS.has(tabParam))
+  const urlTab = (tabParam && VALID_TABS.has(canonicalJobTab(tabParam) ?? ''))
     ? resolveTabForStage(contact?.stage, tabParam)
     : defaultTab
   const [localTab, setLocalTab] = useState<string | null>(null)
@@ -352,16 +351,20 @@ export default function ContactDetail() {
   const [deleting, setDeleting] = useState(false)
   // Edit mode is a flag the Overview tab + section editors read. The
   // header's Edit toggles it and jumps to overview if on another tab; the
-  // More screen's "Edit job details" arrives with ?edit=1.
-  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === '1')
+  // More screen's "Edit job details" arrives with ?edit=1. The flag stays
+  // in the address while editing, so a reload comes back to the open form
+  // (its edits are kept as a draft, D23).
+  const [isEditing, setIsEditingState] = useState(() => searchParams.get('edit') === '1')
   useEffect(() => {
-    if (searchParams.get('edit') !== '1') return
-    setIsEditing(true)
-    const sp = new URLSearchParams(searchParams)
-    sp.delete('edit')
-    setSearchParams(sp, { replace: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (searchParams.get('edit') === '1') setIsEditingState(true)
   }, [searchParams])
+  function setIsEditing(next: boolean, from: URLSearchParams = searchParams) {
+    setIsEditingState(next)
+    const sp = new URLSearchParams(from)
+    if (next) sp.set('edit', '1')
+    else sp.delete('edit')
+    if (sp.toString() !== searchParams.toString()) setSearchParams(sp, { replace: true })
+  }
 
   // Phone (spec 8.1 and 9.4): the page brings its own onyx action
   // capsule, so the dock steps aside while it is mounted. The header's
@@ -400,7 +403,7 @@ export default function ContactDetail() {
       openEvent()
       return
     }
-    if (actionIntent === 'send_invoice' || actionIntent === 'nudge_invoice') {
+    if (actionIntent === 'send_invoice') {
       openInvoice()
     }
   }
@@ -443,8 +446,13 @@ export default function ContactDetail() {
   function handleEditClick() {
     // Edit form lives on Overview today; jump there first if on another tab
     // (preserves the audit-batch-X fix that "EDIT does nothing on Files").
-    if (tab !== 'overview') setTab('overview')
-    setIsEditing((v) => !v)
+    // One address change carries both.
+    const sp = new URLSearchParams(searchParams)
+    if (tab !== 'overview') {
+      setLocalTab('overview')
+      sp.delete('tab')
+    }
+    setIsEditing(!isEditing, sp)
   }
 
   // Loading skeleton
@@ -516,7 +524,7 @@ export default function ContactDetail() {
     if (!contact) return
     const res: any = await reopen(contact)
     if (res?.error) {
-      toastError("Couldn't reopen", res.error.message || 'Try again')
+      toastError("Couldn't reopen", plainError(res.error, 'Try again.'))
       return
     }
     await fetchAll()
@@ -612,6 +620,7 @@ export default function ContactDetail() {
             contact={contact}
             inspections={inspections}
             scheduleItems={scheduleItems}
+            todos={todos}
             userId={user?.id}
             fetchAll={fetchAll}
             patch={patch}
@@ -808,6 +817,7 @@ export default function ContactDetail() {
           onBack={() => navigate(detailHome)}
           onMore={() => navigate(`${home}/more`)}
           onOpenPhotos={() => openSection('files')}
+          editHref={canMoveMoney ? `${home}?edit=1` : undefined}
         />
 
         {actionIntentMeta && (

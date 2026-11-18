@@ -11,6 +11,7 @@ import CreateShell from '../new/CreateShell.tsx'
 import { FOLLOW_UP_PRESETS, followUpMeta, localYmd, saveFollowUp, type FollowUpWhen } from '../../lib/followUp.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { JobScreenFallback, useJobScreen } from './jobScreen.tsx'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 export default function JobFollowUp() {
   const { id } = useParams()
@@ -35,7 +36,7 @@ export default function JobFollowUp() {
     // the screen so the person can try again.
     const res = await saveFollowUp(queryClient, contact, user?.id, when)
     setSaving(false)
-    if (res.error) { setError(res.error.message); return }
+    if (res.error) { setError(plainError(res.error, 'The follow up was not saved. Try again.')); return }
     // Saving lands on the job, whichever screen led here.
     navigate(home, { replace: true })
   }

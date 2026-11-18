@@ -46,9 +46,11 @@ export default async (request) => {
 
   const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
+    const missing = [!SUPABASE_URL && 'SUPABASE_URL', !SERVICE_KEY && 'SUPABASE_SERVICE_ROLE_KEY'].filter(Boolean).join(', ')
+    console.error('[partner-invite] server settings missing:', missing)
     return json({
       error: 'server_misconfigured',
-      detail: 'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in Netlify env.'
+      detail: 'Email invites are not available right now. Try again later.'
     }, 500)
   }
 
@@ -85,7 +87,7 @@ export default async (request) => {
   const authHeader = request.headers.get('authorization') || ''
   const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
   if (!accessToken) {
-    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+    return json({ error: 'missing_token', detail: 'Sign in again, then try again.' }, 401)
   }
   const { data: authData, error: authErr } = await supabase.auth.getUser(accessToken)
   if (authErr || !authData?.user) {
@@ -263,6 +265,8 @@ export function buildResendPatch({ status, partnerName, partnerRole, nowIso, new
 // response and let the client decide how to surface the outcome (success
 // vs. fall back to copy/share). The token has already been issued by the
 // time this runs, so the invite link is valid even if email fails.
+const INVITE_NOT_SENT = 'The invite email did not go out. Copy the invite link and send it yourself.'
+
 async function sendInviteEmail({ request, supabase, ownerUserId, senderUserId, jobId, recipientEmail, inviteUrl, jobName, partnerName, partnerRole }) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY
   const SEND_EMAIL_FROM = process.env.SEND_EMAIL_FROM
@@ -342,12 +346,8 @@ async function sendInviteEmail({ request, supabase, ownerUserId, senderUserId, j
     })
     const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      return {
-        sent: false,
-        send_failed: true,
-        provider_status: res.status,
-        detail: body?.message || body?.error || 'Email provider rejected the send.'
-      }
+      console.error('[partner-invite] send failed', { status: res.status, body })
+      return { sent: false, send_failed: true, detail: INVITE_NOT_SENT }
     }
     // Best-effort activity log; never blocks the response.
     try {
@@ -360,11 +360,8 @@ async function sendInviteEmail({ request, supabase, ownerUserId, senderUserId, j
     } catch {}
     return { sent: true, email_id: body?.id || null }
   } catch (e) {
-    return {
-      sent: false,
-      send_failed: true,
-      detail: e?.message || 'Network error while contacting email provider.'
-    }
+    console.error('[partner-invite] send failed', { error: e?.message || String(e) })
+    return { sent: false, send_failed: true, detail: INVITE_NOT_SENT }
   }
 }
 

@@ -16,10 +16,11 @@ import { useAuth } from '../../contexts/AuthContext.tsx'
 import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { supabase } from '../../lib/supabase.ts'
 import { leadToQuoteDraft, markLeadQuoted, type LeadRow } from '../../lib/leads.ts'
-import { createQuote, invalidateAfterQuoteWrite, plainQuoteError } from '../../lib/quotes.ts'
+import { createQuote, invalidateAfterQuoteWrite } from '../../lib/quotes.ts'
 import { createUuid } from '../../lib/uuid.ts'
-import { JOB_TYPES } from '../../lib/jobTypes.ts'
+import { JOB_TYPES, readLastJobType, writeLastJobType } from '../../lib/jobTypes.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Form = {
   /** The quote's id, minted once per form so a retried save is the same quote. */
@@ -47,7 +48,8 @@ export default function QuoteNew() {
   // backing out of Quote this never leaves that lead in the next plain New
   // quote (S21).
   const draftKind = leadParam ? `quote-lead-${leadParam}` : clientParam ? `quote-client-${clientParam}` : 'quote'
-  const { form, set, patch, done } = useDraft<Form>(draftKind, { ...EMPTY, requestId }, text ? { scope: text } : null)
+  const [lastJobType] = useState(readLastJobType)
+  const { form, set, patch, done } = useDraft<Form>(draftKind, { ...EMPTY, requestId, jobType: lastJobType }, text ? { scope: text } : null)
   const quoteId = form.requestId || requestId
   const savingRef = useRef(false)
   const [client, setClient] = useState<ClientFieldValue>(() => restoredClientValue(form.client, form.clientId))
@@ -86,7 +88,8 @@ export default function QuoteNew() {
       const draft = leadToQuoteDraft(data as LeadRow)
       // The lead's notes are the office's own (a budget, a gate code), never
       // the scope of work the customer reads, so they stay on the lead (S11).
-      patch({ title: draft.title || '', jobType: draft.job_type || '' })
+      // A lead with no job type of its own keeps the remembered one.
+      patch({ title: draft.title || '', ...(draft.job_type ? { jobType: draft.job_type } : {}) })
       if (draft.client_id && !(await pickClient(draft.client_id)) && alive) setPrefillFailed(true)
     })
     return () => { alive = false }
@@ -122,6 +125,7 @@ export default function QuoteNew() {
         try { await markLeadQuoted(leadParam, quote.id) } catch { /* the quote is saved; the lead keeps its status */ }
       }
       done()
+      writeLastJobType(form.jobType)
       invalidateAfterQuoteWrite(queryClient, { quoteId: quote.id, leadId: leadParam, clientId: picked.id })
       hapticMedium()
       // The quote screen opens with its line editor ready for the first line.
@@ -129,10 +133,7 @@ export default function QuoteNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      const message = plainQuoteError(e, '')
-      setError(message === 'Check your connection and try again.' || !message
-        ? 'Could not save this quote. Check your connection and try again.'
-        : message)
+      setError(plainError(e, 'Could not save this quote. Try again.', { kept: true, lead: true }))
     }
   }
 

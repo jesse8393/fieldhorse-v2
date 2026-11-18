@@ -12,6 +12,8 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
+import { goInApp, holdPosts, postsTo } from './helpers/doubleTap.ts'
+import { documentSendKey } from '../../netlify/functions/lib/email.js'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -755,6 +757,20 @@ test.describe('the quote screen', () => {
   })
 })
 
+// The quote screen reads the company's details for its document. The mock
+// once lacked that function and answered 404, which hid any new failure
+// (vibe audit console-4).
+test('opening a quote gets no error from the database', async ({ context, page }) => {
+  await signIn(context)
+  const failed: string[] = []
+  page.on('response', (r) => { if (r.status() >= 400 && r.url().includes('qa-mock.supabase.co')) failed.push(`${r.status()} ${new URL(r.url()).pathname}`) })
+  const branding = page.waitForResponse((r) => r.url().includes('/rest/v1/rpc/fh_company_branding'), { timeout: 30_000 })
+  await page.goto('/quotes/q-quote', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  expect((await branding).status()).toBe(200)
+  await page.waitForLoadState('networkidle')
+  expect(failed).toEqual([])
+})
+
 test.describe('the quotes list', () => {
   test('lists every quote and opens one', async ({ context, page }) => {
     await signIn(context)
@@ -958,7 +974,7 @@ test.describe('errors on the quote screens', () => {
     await context.route((url) => url.pathname.includes('/rest/v1/fh_public_links'), (route) => route.abort('internetdisconnected'))
     await openQuote(page)
     await page.getByRole('list', { name: 'Share or download' }).getByRole('button', { name: /Copy a share link/ }).click()
-    await expect(page.getByText('Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText('No signal right now. Try again when the signal is back.')).toBeVisible()
     await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
   })
 
@@ -980,7 +996,7 @@ test.describe('errors on the quote screens', () => {
     await page.goto('/quotes/new?client=cl-1', { waitUntil: 'domcontentloaded', timeout: 60_000 })
     await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy', { timeout: 30_000 })
     await page.getByRole('button', { name: 'Save quote' }).click()
-    await expect(page.getByText('Could not save this quote. Check your connection and try again.')).toBeVisible()
+    await expect(page.getByText('Could not save this quote. No signal right now. Your work is still here, so try again when the signal is back.')).toBeVisible()
     await expect(page.getByText(/TypeError|Failed to fetch/)).toHaveCount(0)
   })
 })
@@ -1045,3 +1061,163 @@ test('an older record id still opens through the quote address', async ({ contex
   await expect(page.getByText(/Contact not found/i)).toHaveCount(0)
 })
 
+
+// When the proposal went out but could not be marked sent, the server says
+// "Try again to record it. The customer will not get a second email." The
+// retry built and uploaded a new PDF, so the provider key was new and the
+// customer got a second email. A retry now repeats the same send.
+test('Send again after "the customer will not get a second email" repeats the same send', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_quote_items: ITEMS } })
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/q.pdf' } }))
+  const sends = postsTo(context, '/api/send-quote')
+  const notSaved = 'The proposal was sent, but it could not be marked as sent. Try again to record it. The customer will not get a second email.'
+  let n = 0
+  await context.route('**/api/send-quote', (route) => {
+    n += 1
+    return n === 1
+      ? route.fulfill({ status: 500, json: { error: 'status_not_saved', email_sent: true, email_id: 're_1', message: notSaved, detail: notSaved } })
+      : route.fulfill({ status: 200, json: { ok: true } })
+  })
+  await openQuote(page)
+  const send = total(page).getByRole('button', { name: 'Send for approval' })
+  await expect(send).toBeEnabled({ timeout: 30_000 })
+  await send.click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'second email' })).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(800)
+  await send.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(2)
+  const [first, retry] = sends.map((r) => r.postDataJSON())
+  const key = (b: Record<string, unknown>) => documentSendKey('send-quote', `quote:${b.quote_id}`, b, String(b.recipient_email).toLowerCase().trim())
+  expect(key(retry), 'the retry the message invites carries the same provider key').toBe(key(first))
+  expect(retry.storage_path, 'and the same PDF').toBe(first.storage_path)
+})
+
+// Send for approval kept its busy state on the quote screen. Leave the
+// quote while the email is still going out on a weak signal and come back,
+// and Send was free again: one more tap emailed a second proposal. The
+// send is now kept app wide, so the quote is busy until it lands.
+test('leaving the quote while it sends and coming back does not send it twice', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_quote_items: ITEMS } })
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/q.pdf' } }))
+  const sends = postsTo(context, '/api/send-quote')
+  await holdPosts(context, '**/api/send-quote', 6000, () => ({ status: 200, json: { ok: true } }))
+  await openQuote(page)
+  const send = total(page).getByRole('button', { name: 'Send for approval' })
+  await expect(send).toBeEnabled({ timeout: 30_000 })
+  await send.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  await goInApp(page, '/quotes')
+  await page.waitForTimeout(800)
+  await goInApp(page, '/quotes/q-quote')
+  const again = total(page).getByRole('button', { name: 'Send for approval' })
+  await expect(again).toBeVisible({ timeout: 30_000 })
+  // Once the screen has read what it needs, the button takes a tap or says it is busy.
+  await expect.poll(async () => await again.isEnabled() || await again.getAttribute('aria-busy') === 'true', { timeout: 30_000 }).toBe(true)
+  const busy = await again.getAttribute('aria-busy')
+  await again.click({ force: true })
+  await page.waitForTimeout(1500)
+  expect(sends.length, 'one quote, one email').toBe(1)
+  expect(busy, 'Send shows the email going out').toBe('true')
+})
+
+// Finding lost-work-1: what is typed on Scope and terms stays through
+// Back, a reload and the phone's Back until it is saved or discarded.
+const TYPED = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+test.describe('typed words on the quote screens', () => {
+  const WORDS = TYPED
+
+  test('scope and terms keep what was typed through a reload and Back, until discarded', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await page.getByRole('link', { name: /Scope and terms/ }).click()
+    await page.getByLabel('Scope of work').fill(WORDS)
+    await page.getByLabel('Payment terms').fill('Half down, half on completion')
+    await page.reload()
+    await expect(page.getByLabel('Scope of work')).toHaveValue(WORDS)
+    await expect(page.getByLabel('Payment terms')).toHaveValue('Half down, half on completion')
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await page.getByRole('link', { name: /Scope and terms/ }).click()
+    await expect(page.getByLabel('Scope of work')).toHaveValue(WORDS)
+
+    // Discard takes a second tap on the same button, then the saved text is back.
+    await page.getByRole('button', { name: 'Discard' }).click()
+    await expect(page.getByLabel('Scope of work')).toHaveValue(WORDS)
+    await page.waitForTimeout(600)
+    await page.getByRole('button', { name: 'Tap again to discard' }).click()
+    await expect(page.getByLabel('Scope of work')).toHaveValue('')
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+    await page.reload()
+    await expect(page.getByLabel('Scope of work')).toHaveValue('')
+  })
+
+  test('scope and terms drop a draft once the quote was saved differently elsewhere', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    let savedElsewhere = false
+    await context.route((url) => url.pathname.endsWith('/rest/v1/fh_quotes'), (route) => {
+      if (route.request().method() === 'GET' && savedElsewhere) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([quoteRow({ scope_text: 'Saved on the office computer' })]) })
+      }
+      return route.fallback()
+    })
+    await openQuote(page, '/quotes/q-quote/terms')
+    await page.getByLabel('Scope of work').fill(WORDS)
+    await page.waitForTimeout(600)
+    savedElsewhere = true
+    await page.reload()
+    await expect(page.getByLabel('Scope of work')).toHaveValue('Saved on the office computer')
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
+  test('saved terms leave no draft behind', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page, '/quotes/q-quote/terms')
+    await page.getByLabel('Scope of work').fill(WORDS)
+    const saved = page.waitForRequest((r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/fh_quotes'))
+    await page.getByRole('button', { name: 'Save terms' }).click()
+    await saved
+    await expect(page).toHaveURL(/\/quotes\/q-quote$/)
+    await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('fh:draft:edit:')))).toEqual([])
+  })
+})
+
+// Finding lost-work-12: the line editor and the in person approval keep
+// what was typed through a reload too.
+test.describe('typed words on the quote line and approval screens', () => {
+  const WORDS = TYPED
+
+  test('a line being edited stays open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await lines(page).getByRole('button', { name: /Pump truck/ }).click()
+    const editor = page.getByRole('form', { name: 'Edit line' })
+    await editor.getByLabel('Description').fill('Pump truck, 52 meter boom')
+    await editor.getByLabel('Rate').fill('1150')
+    await page.reload()
+    const back = page.getByRole('form', { name: 'Edit line' })
+    await expect(back.getByLabel('Description')).toHaveValue('Pump truck, 52 meter boom')
+    await expect(back.getByLabel('Rate')).toHaveValue('1150')
+  })
+
+  test('a new line being added stays open with what was typed through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page)
+    await page.getByRole('button', { name: 'Add a line' }).click()
+    await page.getByRole('form', { name: 'Add a line' }).getByLabel('Description').fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('form', { name: 'Add a line' }).getByLabel('Description')).toHaveValue(WORDS)
+  })
+
+  test('the in person approval keeps the approver and the note through a reload', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_quote_items: ITEMS } })
+    await openQuote(page, '/quotes/q-quote/approve')
+    await page.getByLabel('Approved by').fill('Dana Roy')
+    await page.getByLabel('Note (optional)').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Approved by')).toHaveValue('Dana Roy')
+    await expect(page.getByLabel('Note (optional)')).toHaveValue(WORDS)
+  })
+})

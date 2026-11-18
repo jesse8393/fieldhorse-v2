@@ -117,6 +117,37 @@ test('tapping a notification opens its link', async ({ context, page }) => {
   await expect(page).toHaveURL(/\/jobs\/c-job2/)
 })
 
+// dead-ends-6: change order and partner notifications open the section they
+// name. Rows already sent carry ?tab=quote and ?tab=partners, which open
+// Change orders and Partner access too, and a new change order writes a row
+// that names Change orders.
+test('change order and partner notifications open the section they name', async ({ context, page }) => {
+  const signed = note('nt-co', 'change_order_signed', 'Change order signed', '/jobs/c-job1?tab=quote')
+  const joined = note('nt-pa', 'partner_accepted', 'Partner joined your job', '/jobs/c-job1?tab=partners')
+  const co = { id: 'co-1', org_id: 'org-1', user_id: 'qa-user-1', contact_id: 'c-job1', sequence_number: 1, title: 'Extra footing', description: null, amount: 1800, status: 'draft', created_at: iso(Date.now() - HOUR) }
+  await signIn(context, { tables: { fh_notifications: [signed, joined], fh_change_orders: [co] } })
+  for (const [title, section] of [['Change order signed', 'Change orders'], ['Partner joined your job', 'Partner access']]) {
+    await open(page, '/notifications', '.fhn')
+    await page.getByRole('button', { name: new RegExp(title) }).click()
+    await expect(page).toHaveURL(/\/jobs\/c-job1\?tab=/)
+    await expect(page.getByRole('region', { name: `${section} workspace`, exact: true })).toBeVisible({ timeout: 30_000 })
+  }
+
+  const written: Record<string, unknown>[] = []
+  await context.route((url) => url.pathname.endsWith('/rest/v1/fh_notifications'), (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    written.push(route.request().postDataJSON())
+    return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' })
+  })
+  await open(page, '/jobs/c-job1?tab=change_orders', '.fh-app-header')
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.getByPlaceholder("Rot at SW corner. Replace ~8' bottom plate").fill('Extra footing')
+  await page.locator('input[inputmode="decimal"]').first().fill('1800')
+  await page.getByRole('button', { name: 'Add change order', exact: true }).click()
+  await expect.poll(() => written.length).toBe(1)
+  expect(written[0]).toMatchObject({ kind: 'change_order_added', link: '/jobs/c-job1?tab=change_orders' })
+})
+
 test('a failed read says so with Try again', async ({ context, page }) => {
   await signIn(context, { tables: { fh_notifications: [APPROVED] } })
   const failing = { on: true }
@@ -165,6 +196,36 @@ test('the bell counts what the screen lists', async ({ context, page }) => {
   await page.getByRole('button', { name: 'Notifications, 3 unread', exact: true }).click()
   await expect(page.getByText('2 customers to follow up and 1 new notification.', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Reminders' }).locator('.fhn-row')).toHaveCount(2)
+})
+
+// The app publishes the same signed in person more than once (the saved
+// session, then the auth listener's own copy), and the bell read its count
+// again for each copy, twice on every app reopen (vibe audit console-1).
+// Here the auth client hears the same session again, the way another tab's
+// token refresh reaches it, and the bell must not read again.
+test('the bell reads its count once for the same person, however often the session is published', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_notifications: [APPROVED] } })
+  const reads: string[] = []
+  page.on('request', (request) => {
+    const url = request.url()
+    if (url.includes('/rest/v1/rpc/fh_my_open_reminders') || (url.includes('/rest/v1/fh_notifications') && url.includes('read_at=is.null'))) reads.push(`${request.method()} ${url}`)
+  })
+  await open(page, '/work', '.fhs-header')
+  await expect(page.getByRole('button', { name: 'Notifications, 1 unread', exact: true })).toBeVisible()
+  await page.waitForTimeout(1000)
+  const settled = reads.length
+  expect(settled).toBeGreaterThan(0)
+  await page.evaluate(() => {
+    const key = 'sb-qa-mock-auth-token'
+    const session = JSON.parse(localStorage.getItem(key) || 'null')
+    const channel = new BroadcastChannel(key)
+    channel.postMessage({ event: 'TOKEN_REFRESHED', session })
+    channel.postMessage({ event: 'SIGNED_IN', session: { ...session, user: { ...session.user } } })
+    channel.close()
+  })
+  await page.waitForTimeout(1500)
+  await expect(page.getByRole('button', { name: 'Notifications, 1 unread', exact: true })).toBeVisible()
+  expect(reads.slice(settled)).toEqual([])
 })
 
 test('a reminder row offers Text, Done closes every reminder for that client and the row leaves', async ({ context, page }) => {

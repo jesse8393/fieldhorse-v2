@@ -8,6 +8,10 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { canHover } from '../../../lib/hover.ts'
 import { PostedByChip, Eyebrow } from '../../../components/v3'
 import { useArmedId } from '../../../lib/secondTap.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
+import { dateAndTime } from '../../../lib/dates.ts'
+import { useEditDraft } from '../../../lib/useEditDraft.ts'
+import DraftRestored from '../../../components/DraftRestored.tsx'
 
 /**
  * Messages section, communication log (fh_notes) tied to this job.
@@ -18,7 +22,11 @@ import { useArmedId } from '../../../lib/secondTap.ts'
  * Text/Email/Call quick actions on Jobs.jsx, same fh_notes table.
  */
 export default function MessagesSection({ contactId, userId, notes = [], fetchAll }: any) {
-  const [draft, setDraft] = useState('')
+  // The note being written stays on the device per job until it is logged,
+  // so a tap on another section or a reload keeps it (D23).
+  const note = useEditDraft(contactId ? `job-note:${contactId}` : null, { text: '' }, { from: 'note' })
+  const draft = note.form.text
+  const setDraft = (value: string) => note.set('text', value)
   const [saving, setSaving] = useState(false)
   // Delete takes a second tap on the same note's button (D57).
   const deleteTap = useArmedId()
@@ -36,7 +44,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
     })
     setSaving(false)
     if (error) {
-      toastError("Couldn't add note", error.message)
+      toastError("Couldn't add note", plainError(error, 'Try again.'))
       return
     }
     if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')
@@ -91,6 +99,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
         )}
       </div>
 
+      {note.restored && <DraftRestored onDiscard={note.discard} />}
       <div style={{ display: 'flex', gap: 8 }}>
         <input
           value={draft}
@@ -137,7 +146,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <FileText size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>No communications logged. Every touchpoint, call, text, onsite, captured in order.</div>
+          <div>No communications logged. Every call, text and site visit shows here in order.</div>
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -169,10 +178,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
                     color: 'var(--v3-text-muted)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {n.category || 'note'} · {new Date(n.created_at).toLocaleString(undefined, {
-                      month: 'short', day: 'numeric',
-                      hour: 'numeric', minute: '2-digit'
-                    })}
+                    {n.category || 'note'} · {dateAndTime(n.created_at)}
                   </div>
                   {n.user_id && <PostedByChip userId={n.user_id} verb="posted" style={{ marginTop: 2 }} />}
                 </div>

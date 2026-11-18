@@ -24,6 +24,8 @@ import { money } from '../documents/format.ts'
 import { companyShortName } from '../../lib/quoteMoney.ts'
 import { personFirstName } from '../../lib/quoteView.ts'
 import '../documents/fieldhorse-proposal.css'
+import { errorKind, plainError } from '../../lib/serviceErrors.ts'
+import { dateAndTime } from '../../lib/dates.ts'
 
 /**
  * What the page found when it read the quote again just before posting an
@@ -40,6 +42,12 @@ export type ApproveCheck =
 
 // What the customer reads for an error the link answers, the same words
 // whether the read before an approval or the approval itself got it.
+// A dropped connection, in the homeowner's words: who could not be
+// reached, what to tap again and that nothing happened yet (raw-errors-8).
+function unreachableText(companyName: string, retry: string, nothingYet: string): string {
+  return `We could not reach ${companyName || 'the contractor'} just now. Check your connection and tap ${retry} again. ${nothingYet}`
+}
+
 function approveErrorText(error: unknown, message: unknown, docLabel: string, companyName: string, fallback: string): string {
   if (error === 'already_approved') return `This ${docLabel} has already been approved, thank you.`
   if (error === 'expired') return 'This link has expired. Please ask the contractor for a fresh one.'
@@ -109,6 +117,8 @@ export default function ApproveProposalBar({
   const askable = canAsk !== false
 
   const ready = name.trim().length > 1 && authorized && !busy
+  // The approve button's own words, for a message that says tap it again.
+  const approveLabel = skin === 'fieldhorse' && !isCO ? 'Approve this quote' : 'Approve & notify contractor'
   // A seeded question that is still only its prefilled lead in has nothing
   // to send yet: sending it would pause approval with an empty request.
   const seedText = String(requestSeed?.text || '').trim()
@@ -190,7 +200,9 @@ export default function ApproveProposalBar({
       })
       onApproved?.()
     } catch (err: any) {
-      setError(err.message || 'Something went wrong.')
+      setError(errorKind(err) === 'offline'
+        ? unreachableText(companyName, approveLabel, 'Nothing was approved yet.')
+        : plainError(err, 'We could not record your approval. Please try again.'))
     } finally {
       setBusy(false)
     }
@@ -232,7 +244,9 @@ export default function ApproveProposalBar({
       })
       onRequested?.()
     } catch (err: any) {
-      setError(err.message || 'Something went wrong.')
+      setError(errorKind(err) === 'offline'
+        ? unreachableText(companyName, 'Send request', 'Your request was not sent yet.')
+        : plainError(err, 'We could not send your request. Please try again.'))
     } finally {
       setBusy(false)
     }
@@ -425,7 +439,7 @@ export default function ApproveProposalBar({
           checked={authorized}
           disabled={busy}
           onChange={(e) => setAuthorized(e.target.checked)}
-          style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: '#C9963A' }}
+          style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--fh-gold)' }}
         />
         <span>
           I have the authority to approve this {docLabel} on behalf of {contactName || 'the property owner'}, and I agree to the scope and terms shown above. Approving creates a binding record with my name, the date, and my IP address.
@@ -677,11 +691,7 @@ function moneyFmt(n: any) {
 
 function formatStamp(iso: any) {
   try {
-    const d = new Date(iso)
-    return d.toLocaleString(undefined, {
-      month: 'short', day: 'numeric', year: 'numeric',
-      hour: 'numeric', minute: '2-digit'
-    })
+    return dateAndTime(iso, { year: true })
   } catch { return '' }
 }
 
@@ -691,7 +701,7 @@ const panelStyle: import('react').CSSProperties = {
   padding: '24px 24px 24px',
   borderRadius: 10,
   background: '#F2EDE4',
-  border: '1px solid rgba(201, 150, 58, 0.45)',
+  border: '1px solid rgba(173, 64, 41, 0.45)',
   boxShadow: '0 24px 64px -32px rgba(20, 20, 20, 0.25)',
   fontFamily: 'var(--font-body)',
   color: '#141414'
@@ -749,12 +759,14 @@ const buttonStyle: import('react').CSSProperties = {
   minHeight: 44,
   padding: '0 16px',
   borderRadius: 10, border: 'none',
-  background: 'linear-gradient(135deg, #C9963A 0%, #C9963A 100%)',
-  color: '#141414',
+  // The brand copper, with the white it was chosen to carry. Dark text on
+  // copper reads at about 3 to 1, below what a customer needs.
+  background: 'var(--fh-gold)',
+  color: 'var(--fh-on-gold)',
   fontFamily: 'var(--font-body)',
   fontSize: 14, fontWeight: 700,
   letterSpacing: 0,
-  boxShadow: '0 6px 16px rgba(201, 150, 58, 0.3)'
+  boxShadow: '0 6px 16px rgba(173, 64, 41, 0.3)'
 }
 
 const secondaryButtonStyle: import('react').CSSProperties = {
@@ -796,5 +808,5 @@ const metaRowStyle: import('react').CSSProperties = {
 
 const dotStyle: import('react').CSSProperties = {
   display: 'inline-block', width: 3, height: 3, borderRadius: 10,
-  background: '#C9963A'
+  background: 'var(--fh-gold)'
 }

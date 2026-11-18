@@ -30,16 +30,16 @@ export default function MoreScreen() {
 
         <SectionLabel style={{ marginBottom: 10 }}>Tools</SectionLabel>
         <View style={{ gap: 12, marginBottom: 24 }}>
-          <MenuRow icon={<Bot color={theme.goldBright} size={18} />} title="Dispatch AI" sub="Talk to add jobs, schedule & export" onPress={() => router.push('/assistant')} />
-          {showMoney ? <MenuRow icon={<Sparkles color={theme.goldBright} size={18} />} title="AI estimate" sub="Scope to line item bid in seconds" onPress={() => router.push('/bid')} /> : null}
+          <MenuRow icon={<Bot color={theme.goldBright} size={18} />} title="Dispatch" sub="Talk to add jobs, schedule & export" onPress={() => router.push('/assistant')} />
+          {showMoney ? <MenuRow icon={<Sparkles color={theme.goldBright} size={18} />} title="AI estimate" sub="Turn a scope into a priced estimate" onPress={() => router.push('/bid')} /> : null}
           <MenuRow icon={<MessageSquare color={theme.goldBright} size={18} />} title="Compose" sub="Draft branded texts & emails" onPress={() => router.push('/compose')} />
-          {showMoney ? <MenuRow icon={<Receipt color={theme.goldBright} size={18} />} title="Invoices & Payments" sub="Money owed, aging & mark paid" onPress={() => router.push('/invoices')} /> : null}
+          {showMoney ? <MenuRow icon={<Receipt color={theme.goldBright} size={18} />} title="Invoices and payments" sub="Money owed, aging & mark paid" onPress={() => router.push('/invoices')} /> : null}
           <MenuRow icon={<StickyNote color={theme.goldBright} size={18} />} title="Notes" sub="Capture, link to jobs & review" onPress={() => router.push('/notes')} />
           <MenuRow icon={<Activity color={theme.goldBright} size={18} />} title="Activity" sub="Payments, leads, invoices & notes" onPress={() => router.push('/activity')} />
           {showMoney ? <MenuRow icon={<FileSignature color={theme.goldBright} size={18} />} title="Estimates" sub="Proposals, win rate & open value" onPress={() => router.push('/estimates')} /> : null}
           <MenuRow icon={<Users color={theme.goldBright} size={18} />} title="Partners" sub="People you've shared jobs with" onPress={() => router.push('/partners')} />
           <MenuRow icon={<Hammer color={theme.goldBright} size={18} />} title="Subs" sub="Trade directory, rates & job history" onPress={() => router.push('/subs')} />
-          <MenuRow icon={<CloudSun color={theme.goldBright} size={18} />} title="Pour Window" sub="Weather work window by trade" onPress={() => router.push('/pour-window')} />
+          <MenuRow icon={<CloudSun color={theme.goldBright} size={18} />} title="Pour window" sub="Weather work window by trade" onPress={() => router.push('/pour-window')} />
           {showMoney ? <MenuRow icon={<BarChart3 color={theme.goldBright} size={18} />} title="Analytics" sub="Pipeline, revenue & stage breakdown" onPress={() => router.push('/analytics')} /> : null}
           <MenuRow icon={<Bell color={theme.goldBright} size={18} />} title="Notifications" sub="Activity & alerts" onPress={() => router.push('/notifications')} />
           <MenuRow icon={<Building2 color={theme.goldBright} size={18} />} title="Business profile" sub="Company info for quotes & invoices" onPress={() => router.push('/settings')} />

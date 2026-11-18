@@ -21,6 +21,7 @@ import { canHover } from '../lib/hover.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useJobs, useJobsRealtime, useJobSearch, jobsKey, type JobRow } from '../lib/queries.ts'
 import { searchWorkJobs } from '../lib/workList.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 function followUpMeta(c: Pick<JobRow, 'follow_up_on'>): { label: string; tone: 'danger' | 'warn' | 'muted' } | null {
   if (!c.follow_up_on) return null
@@ -70,7 +71,7 @@ export default function Work() {
   const rows = useMemo(() => searchWorkJobs(contacts, searchCurrent ? serverHits : [], search), [contacts, serverHits, search, searchCurrent])
   const contactsById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows])
   const [busyId, setBusyId] = useState<string | null>(null)
-  const loadError = isError ? error instanceof Error ? error.message : 'The job list could not load.' : ''
+  const loadError = isError ? plainError(error, 'The job list could not load.') : ''
   // Guards concurrent stage moves without making `run` depend on the
   // busyId state (which would re-create every per-row handler on each
   // busy toggle and defeat DealCard's memoization). busyId state stays
@@ -100,7 +101,7 @@ export default function Work() {
       await refresh()
       after?.()
     } catch (e: any) {
-      toastError(failMsg, e?.message || 'Try again')
+      toastError(failMsg, plainError(e, 'Try again.'))
       await refresh()
     } finally {
       busyRef.current = false

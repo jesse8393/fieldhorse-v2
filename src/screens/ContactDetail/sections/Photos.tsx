@@ -23,6 +23,7 @@ import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { jobPhotosKey } from '../phone/SpineList.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const BUCKET = 'job-photos'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per photo
@@ -212,7 +213,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
         try {
           uploadBlob = await compressImageToBlob(file, 1_500_000, 1800)
         } catch (ex: any) {
-          toastError("Couldn't process photo", ex?.message || `${file.name} skipped`)
+          toastError("Couldn't process photo", plainError(ex, `${file.name} was skipped. Try another photo.`))
           continue
         }
         const rowId = createUuid()
@@ -290,7 +291,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
         }
       }
     } catch (ex: any) {
-      toastError('Upload failed', ex?.message || 'Try again')
+      toastError('Upload failed', plainError(ex, 'Try again.'))
     } finally {
       setUploading(false)
       setUploadProgress({ current: 0, total: 0 })
@@ -334,9 +335,11 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       .eq('id', rowId)
       .select('id')
     if (error || !data?.length) {
-      toastError("Couldn't save caption", error?.message || 'This photo may have been deleted.')
+      toastError("Couldn't save caption", plainError(error, 'This photo may have been deleted.'))
       fetchRows()
+      return false
     }
+    return true
   }
 
   // Tagging a photo to a scope section ("Roofing", "Demolition", …) lets
@@ -353,7 +356,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       .eq('id', rowId)
       .select('id')
     if (error || !data?.length) {
-      toastError("Couldn't save section tag", error?.message || 'This photo may have been deleted.')
+      toastError("Couldn't save section tag", plainError(error, 'This photo may have been deleted.'))
       fetchRows()
     }
   }
@@ -388,7 +391,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       await fetchRows()
       refreshJobPhotos()
     } catch (ex: any) {
-      toastError('Delete failed', ex?.message || 'Try again')
+      toastError('Delete failed', plainError(ex, 'Try again.'))
     } finally {
       setDeleting(false)
     }
@@ -711,9 +714,21 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
   const [sectionTag, setSectionTag] = useState(row.section_tag || '')
   const [customTag, setCustomTag] = useState('')
   const [showCustom, setShowCustom] = useState(false)
+  // A caption typed and not saved yet (the save is out, or the server
+  // refused it). The row read again after a failure must not put the old
+  // caption back over it; leaving the field again tries once more.
+  const unsavedCaption = useRef<{ id: any; text: string } | null>(null)
+
+  async function commitCaption() {
+    const typed = { id: row.id, text: caption }
+    unsavedCaption.current = typed
+    const saved = await onSaveCaption(caption)
+    if (saved !== false && unsavedCaption.current === typed) unsavedCaption.current = null
+  }
 
   useEffect(() => {
-    setCaption(row.caption || '')
+    const kept = unsavedCaption.current
+    setCaption(kept && kept.id === row.id ? kept.text : (row.caption || ''))
     const tag = row.section_tag || ''
     setSectionTag(tag)
     setShowCustom(!!tag && !SCOPE_SECTIONS.includes(tag))
@@ -936,7 +951,7 @@ function PhotoLightbox({ row, url, hasPrev, hasNext, onPrev, onNext, onClose, on
             aria-label="Photo caption"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            onBlur={() => onSaveCaption(caption)}
+            onBlur={() => { void commitCaption() }}
             rows={2}
             placeholder="What's in this photo?"
             style={{

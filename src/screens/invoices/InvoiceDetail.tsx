@@ -34,7 +34,9 @@ import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { parseDateOnly } from '../../lib/dates.ts'
 import type { InvoiceRecord } from '../../lib/queries.ts'
 import { goBackFrom, shortDate, useInvoiceScreen } from './useInvoiceScreen.ts'
+import { useFitWidth } from '../../lib/useFitWidth.ts'
 import './invoices.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // pdf.js pulls in jspdf. Load it on the first PDF tap only.
 const loadPdf = () => import('../../lib/pdf.js')
@@ -66,7 +68,7 @@ export default function InvoiceDetail() {
 
 function InvoiceDetailScreen({ id }: { id: string | undefined }) {
   const navigate = useNavigate()
-  const { user, query, record, figures, billingReview, loadCompany, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
+  const { user, query, record, figures, billingReview, loadCompany, companyName, now, sending, refresh, patchInvoice, send } = useInvoiceScreen(id)
   const waitId = useId()
   const titleRef = useRef<HTMLHeadingElement>(null)
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -125,7 +127,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
         return saved
       } catch (e) {
         setDescriptionError('Description unsaved. Try again before continuing.')
-        toastError("Couldn't save description", (e as Error)?.message || 'Try again')
+        toastError("Couldn't save description", plainError(e, 'Try again.'))
         return null
       }
     })()
@@ -165,7 +167,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
       downloadPdf(result)
       toastSuccess('Invoice PDF downloaded', result.filename)
     } catch (e) {
-      toastError("Couldn't generate PDF", (e as Error)?.message || 'Try again')
+      toastError("Couldn't generate PDF", plainError(e, 'Try again.'))
     } finally {
       setDownloading(false)
     }
@@ -196,7 +198,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
         toastSuccess('Share link ready', link.url)
       }
     } catch (e) {
-      toastError("Couldn't mint share link", (e as Error)?.message || 'Try again.')
+      toastError("Couldn't mint share link", plainError(e, 'Try again.'))
     } finally {
       setSharing(false)
     }
@@ -220,7 +222,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
     const { error } = await setInvoiceStatus(invoice, 'void')
     setVoiding(false)
     if (error) {
-      toastError("Couldn't void", error.message || 'Try again')
+      toastError("Couldn't void", plainError(error, 'Try again.'))
       return
     }
     patchInvoice({ status: 'void' })
@@ -229,6 +231,11 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
   }
 
   const back = () => goBackFrom(navigate, '/invoices')
+
+  // The amount due stays whole on one line, scaled down to fit when the
+  // phone's text is big or the screen is narrow.
+  const heroAmount = !figures ? '' : figures.standing.status === 'paid' ? 'Paid' : figures.standing.status === 'void' ? 'Void' : formatMoney(figures.due)
+  const heroAmountRef = useFitWidth<HTMLParagraphElement>(heroAmount)
 
   if (query.isError) {
     return (
@@ -263,7 +270,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
     )
   }
 
-  const { to, due, standing, settled, isDraft, linkedPayments, dates } = figures
+  const { to, standing, settled, isDraft, linkedPayments, dates } = figures
   const chip = statusChip(standing)
   const paidOnIt = linkedPayments.reduce((s, p) => s + Number(p.amount || 0), 0)
   const canRemind = standing.issued && !settled
@@ -279,15 +286,15 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
       </header>
 
       <section className="fhinv-hero" aria-label="Invoice summary">
-        <p className="fhinv-hero__facts" title={invoice.id}>{invoiceReference(invoice)}</p>
+        <p className="fhinv-hero__facts" title={invoice.id}>{invoiceReference(invoice, companyName)}</p>
         <p className="fhinv-hero__who">{to.name || 'Customer'}</p>
         {record.job ? (
           <Link className="fhinv-hero__job" to={`/jobs/${record.job.id}?tab=financials`}>{jobTitle || 'Open job'}</Link>
         ) : record.client?.company_name ? (
           <p className="fhinv-hero__job">{record.client.company_name}</p>
         ) : null}
-        <p className={`fhinv-hero__amount${settled ? ' is-settled' : ''}`}>
-          {standing.status === 'paid' ? 'Paid' : standing.status === 'void' ? 'Void' : formatMoney(due)}
+        <p className={`fhinv-hero__amount${settled ? ' is-settled' : ''}`} ref={heroAmountRef}>
+          {heroAmount}
         </p>
         <div className="fhinv-hero__status">
           <Chip label={chip.label} tone={chip.tone} />
@@ -299,7 +306,7 @@ function InvoiceDetailScreen({ id }: { id: string | undefined }) {
         </p>
       </section>
 
-      {isDraft && billingReview && <InvoiceBillingReview review={billingReview} acknowledged={duplicateReviewed} onAcknowledge={setDuplicateReviewed} />}
+      {isDraft && billingReview && <InvoiceBillingReview review={billingReview} companyName={companyName} acknowledged={duplicateReviewed} onAcknowledge={setDuplicateReviewed} />}
       <section className="fhinv-section" aria-label="Description">
         <Field
           multiline

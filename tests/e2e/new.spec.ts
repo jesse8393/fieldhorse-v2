@@ -7,6 +7,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { isReadOnlyRpc } from './helpers/readRpc.ts'
+import { FAIL, expectPlain, failRest } from './helpers/rawErrors.ts'
 
 const NOW = '2026-10-08T15:00:00.000Z'
 
@@ -55,6 +56,21 @@ test('New opens a full screen with five rows', async ({ context, page }) => {
   await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
 })
 
+// dead-ends-3: crew and foremen cannot create leads, quotes, jobs or
+// invoices, so the header offers them no New to tap and bounce off.
+for (const role of ['crew', 'foreman']) {
+  test(`${role} see no New button in the header`, async ({ context, page }) => {
+    await signIn(context, { role })
+    for (const path of ['/crew', '/schedule', '/jobs']) {
+      await open(page, path)
+      const header = page.locator('.fh-app-header')
+      await expect(header.getByRole('button', { name: 'Search everything' })).toBeVisible({ timeout: 30_000 })
+      await expect(header.getByRole('link', { name: 'New', exact: true })).toHaveCount(0)
+      await expect(page).toHaveURL(new RegExp(`${path}$`))
+    }
+  })
+}
+
 test('New quote never shows the lead form', async ({ context, page }) => {
   await signIn(context)
   await open(page, '/new')
@@ -100,6 +116,40 @@ test('a job saves with a client and a title', async ({ context, page }) => {
   expect(inserts[0]).toMatchObject({ stage: 'job', client_id: 'cl-1', job_title: 'Shed slab', name: 'Jeff Roy' })
 })
 
+// raw-errors-2: a refused or dropped save on New job showed the database's
+// words or "TypeError: Failed to fetch" above Save job.
+test('a refused or dropped save on New job says what to do in plain words', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  let answer: 'refuse' | 'drop' = 'refuse'
+  await context.route(/\/rest\/v1\/fh_contacts(\?|$)/, (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return answer === 'drop' ? route.abort('failed') : route.fulfill(FAIL.rls('fh_contacts'))
+  })
+  await open(page, '/jobs/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByLabel('Title').fill('Shed slab')
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'Could not save this job. Your role does not allow this. Ask an owner or admin.')
+  answer = 'drop'
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'Could not save this job. No signal right now. Your work is still here, so try again when the signal is back.')
+  await expect(page.getByLabel('Title')).toHaveValue('Shed slab')
+})
+
+// raw-errors-3: the quote helper let the database's refusal through.
+test('a refused save on New quote says so in plain words', async ({ context, page }) => {
+  await signIn(context)
+  await failRest(context, 'fh_quotes', 'POST', FAIL.rls('fh_quotes'))
+  await open(page, '/quotes/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New quote' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'Could not save this quote. Your role does not allow this. Ask an owner or admin.')
+})
+
 test('an invoice from a job prefills only unbilled contract value', async ({ context, page }) => {
   await signIn(context, { tables: {
     ...JOB_FIRST,
@@ -133,6 +183,90 @@ test('a fully invoiced job never prefills or saves the unpaid balance again', as
   await page.getByRole('button', { name: 'Save invoice' }).click()
   await expect(page.getByText(/Only \$0(?:\.00)? remains unreserved/)).toBeVisible()
   expect(invoiceWrites).toBe(0)
+})
+
+// The job type picked on the last saved job or quote starts the next New
+// job and New quote, as the old lead sheet did (vibe audit
+// settings-wiped-2). A company that pours concrete picks it once.
+test('the job type of the last saved job starts the next New job and New quote', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  await open(page, '/jobs/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel(/Job type/)).toHaveValue('')
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByLabel('Title').fill('Shed slab')
+  await page.getByLabel(/Job type/).selectOption('Concrete')
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1/, { timeout: 30_000 })
+
+  await open(page, '/quotes/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+  await page.getByLabel('Client').fill('Dana Whitfield')
+  await page.getByLabel(/Job type/).selectOption('Roofing')
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote/, { timeout: 30_000 })
+  await open(page, '/jobs/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Roofing', { timeout: 30_000 })
+})
+
+// A Save right after a change left the draft timer running. It wrote the
+// saved job back as the draft once the job screen was loading, so the next
+// New job opened refilled with the job just saved.
+test('a saved job leaves no draft behind', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  await open(page, '/jobs/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByLabel('Title').fill('Shed slab')
+  await page.getByLabel(/Job type/).selectOption('Concrete')
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1/, { timeout: 30_000 })
+  await page.waitForTimeout(1000)
+  expect(await page.evaluate(() => localStorage.getItem('fh:draft:job'))).toBeNull()
+})
+
+// Most leads carry no job type, because New lead has no such field. Quote
+// this on one of them kept the remembered job type only when the lead
+// named none of its own.
+function lead(partial: Record<string, unknown>) {
+  return {
+    user_id: 'qa-user-1', client_id: 'cl-1', status: 'open', notes: null, last_contact: null, quote_id: null, follow_up_on: null,
+    source: 'Google', referred_by: null, origin_contact_id: null, created_at: NOW, updated_at: NOW,
+    fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' },
+    ...partial
+  }
+}
+const LEAD_PLAIN = lead({ id: 'l-plain', title: 'Backyard patio', job_type: null })
+const LEAD_ROOF = lead({ id: 'l-roof', title: 'Garage roof', job_type: 'Roofing' })
+
+test('Quote this on a lead with no job type keeps the remembered job type', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_PLAIN, LEAD_ROOF] } })
+  await context.addInitScript(() => { localStorage.setItem('fh:last-job-type', 'Concrete') })
+  await open(page, '/quotes/new?lead=l-plain')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard patio', { timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete')
+  // A lead that names its own job type still starts the quote with it.
+  await open(page, '/quotes/new?lead=l-roof')
+  await expect(page.getByLabel('Title')).toHaveValue('Garage roof', { timeout: 30_000 })
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Roofing')
+})
+
+test('the job type the old lead sheet remembered still starts New job', async ({ context, page }) => {
+  await signIn(context)
+  // The build before the October redesign kept it under fh:lastJobType.
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem('old-job-type-seeded')) return
+    sessionStorage.setItem('old-job-type-seeded', '1')
+    localStorage.setItem('fh:lastJobType', 'Concrete')
+  })
+  await open(page, '/jobs/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+  expect(await page.evaluate(() => localStorage.getItem('fh:lastJobType'))).toBeNull()
+  await open(page, '/quotes/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
 })
 
 test('typing a new name on Quote creates the client', async ({ context, page }) => {
@@ -524,4 +658,34 @@ test('New lead marks its name as required', async ({ context, page }) => {
   await expect(page.locator('label', { has: page.getByText('Required', { exact: true }) })).toHaveText(/^Name\s*Required$/)
   // The optional fields stay optional.
   expect(await required(page.getByRole('textbox', { name: /^Phone/ }))).toBe(false)
+})
+
+// Review of lost-work-4: Log miles and New sub keep what was typed through
+// a reload, as the other create screens do, until the save lands.
+test('Log miles keeps the miles and purpose through a reload', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/miles/new')
+  await page.getByLabel('Miles', { exact: true }).fill('42')
+  await page.getByLabel('Purpose', { exact: true }).fill('Supplier run for rebar')
+  await page.reload()
+  await expect(page.getByLabel('Miles', { exact: true })).toHaveValue('42')
+  await expect(page.getByLabel('Purpose', { exact: true })).toHaveValue('Supplier run for rebar')
+})
+
+test('Log miles with nothing typed keeps no draft, so the date stays today', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/miles/new')
+  await expect(page.getByLabel('Miles', { exact: true })).toBeVisible()
+  await page.waitForTimeout(600)
+  expect(await page.evaluate(() => localStorage.getItem('fh:draft:miles'))).toBeNull()
+})
+
+test('New sub keeps the name and trade through a reload', async ({ context, page }) => {
+  await signIn(context)
+  await page.goto('/subs/new')
+  await page.getByLabel('Name', { exact: true }).fill('Ridge Line Framing')
+  await page.getByLabel('Trade', { exact: true }).fill('Framer')
+  await page.reload()
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Ridge Line Framing')
+  await expect(page.getByLabel('Trade', { exact: true })).toHaveValue('Framer')
 })

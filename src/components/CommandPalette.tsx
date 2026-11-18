@@ -63,9 +63,11 @@ import { stageLabel } from '../lib/stages.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useOrgScope, type OrgScope } from '../lib/orgScope.ts'
+import { useDocumentCompanyName } from '../lib/companyBranding.ts'
 import type { OrgRole } from '../lib/permissions.ts'
 import DataErrorState from './DataErrorState.tsx'
 import '../styles/command-palette.css'
+import { plainError } from '../lib/serviceErrors.ts'
 
 type NavEntry = {
   id: string
@@ -197,6 +199,8 @@ export default function CommandPalette() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const orgScope = useOrgScope(user?.id)
+  // Invoices are found and shown by their printed number (formats-1).
+  const companyName = useDocumentCompanyName(orgScope)
   const { canViewRoute, canCreateFinancialDocs, role, loading: membershipLoading, error: membershipError, refresh: refreshMembership } = useMembership()
   // Old-company rows disappear in the render that changes workspace, before
   // the next request starts. Late answers are also rejected by effect cleanup.
@@ -274,12 +278,12 @@ export default function CommandPalette() {
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const data = await universalSearch(q, user.id, orgScope, role)
+        const data = await universalSearch(q, user.id, orgScope, role, companyName)
         if (!cancelled) setResultSnapshot({ userId: user.id, scope: orgScope, role, query: q, data })
       } catch (e: unknown) {
         if (!cancelled) {
           setResultSnapshot(null)
-          setSearchError(e instanceof Error && e.message ? e.message : 'Search is unavailable right now.')
+          setSearchError(plainError(e, 'Search is unavailable right now.'))
         }
       } finally {
         if (!cancelled) setSearching(false)
@@ -289,7 +293,7 @@ export default function CommandPalette() {
       cancelled = true
       clearTimeout(t)
     }
-  }, [query, open, user?.id, orgScope, role, membershipLoading, membershipError, retryTick])
+  }, [query, open, user?.id, orgScope, role, companyName, membershipLoading, membershipError, retryTick])
 
   function go(to: string) {
     setOpen(false)

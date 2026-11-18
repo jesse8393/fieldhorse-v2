@@ -7,10 +7,11 @@ import { moneyExact } from '../../../lib/format.ts'
 import { crewLaborForContact, type CrewLabor } from '../../../lib/labor.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
-import { todayYmd } from '../../../lib/dates.ts'
+import { formatDate, todayYmd } from '../../../lib/dates.ts'
 import { Button, Field } from '../../../components/fh'
 import { Choices, moneyInput } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const EXPENSE_CATEGORIES = [
   { value: 'Materials', label: 'Materials' },
@@ -72,7 +73,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       expense_date: form.expense_date
     })
     if (error) {
-      toastError("Couldn't add expense", error.message)
+      toastError("Couldn't add expense", plainError(error, 'Try again.'))
       setSaving(false)
       return
     }
@@ -88,7 +89,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
     // By id, with the row asked back: an expense a teammate logged carries
     // their id, so a user filter matched nothing and still said removed.
     const { data: removed, error } = await supabase.from('fh_expenses').delete().eq('id', id).eq('contact_id', contact.id).select('id')
-    if (error) { toastError("Couldn't delete", error.message); return }
+    if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); return }
     if (!removed?.length) {
       toastError("Couldn't delete", 'This expense was not removed. It may be gone already, or you may not have access to it.')
       fetchAll?.()
@@ -103,7 +104,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_expenses').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         await recalcCost(contact.id, userId)
         fetchAll?.()
         toastSuccess('Restored', snapshot.description || '')
@@ -144,7 +145,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
             <div style={{ fontSize: 12, color: 'var(--v3-text-muted)', marginTop: 2 }}>
               {crewLabor.punches} clock in{crewLabor.punches === 1 ? '' : 's'}
               {crewLabor.unratedHours > 0.05
-                ? ` · ${crewLabor.unratedHours.toFixed(1)}h missing a rate, set rates in Timesheets`
+                ? ` · ${crewLabor.unratedHours.toFixed(1)}h missing a rate. Set rates in Timesheets`
                 : ' · counted in job cost'}
             </div>
           </div>
@@ -201,7 +202,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
           fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
-          No expenses yet. Materials, fuel, permits, log as you go so margin stays real.
+          No expenses yet. Log materials, fuel and permits as you go so the margin stays real.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -243,7 +244,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
                     fontVariantNumeric: 'tabular-nums',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                   }}>
-                    {e.category} · {e.expense_date}
+                    {e.category} · {formatDate(e.expense_date) || e.expense_date}
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>

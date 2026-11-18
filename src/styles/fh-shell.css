@@ -194,13 +194,16 @@
 }
 .fhs-dock__side {
   flex: 1;
+  min-width: 0;
   display: flex;
   justify-content: space-around;
 }
+/* No fixed minimum: at a big zoom the tabs share what room there is
+   rather than push Schedule and Money off the screen. */
 .fhs-dock__item {
   position: relative;
   flex: 1;
-  min-width: 48px;
+  min-width: 0;
   max-width: 88px;
   display: flex;
   flex-direction: column;
@@ -221,6 +224,16 @@
   white-space: nowrap;
 }
 .fhs-dock__item.is-active .fhs-dock__label { font-weight: 600; }
+/* Icons alone once the labels no longer fit (Dock.tsx); each label stays
+   as its tab's name for a screen reader. */
+.fhs-dock.is-icons-only .fhs-dock__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .fhs-dock__dot {
   position: absolute;
   bottom: 6px;
@@ -241,6 +254,19 @@
   padding-bottom: 12px;
 }
 .fhs-dock__label--coin { color: var(--fh-linen); }
+/* A slimmer center on a narrow phone keeps the labels apart, and at about
+   125 percent zoom or more a slimmer edge leaves each tab room for its
+   icon. */
+@media (max-width: 339px) {
+  .fhs-dock__center { flex-basis: 60px; }
+}
+@media (max-width: 299px) {
+  .fhs-dock {
+    width: calc(100% - 16px);
+    padding: 0 4px;
+  }
+  .fhs-dock__center { flex-basis: 52px; }
+}
 .fhs-dock__coin {
   position: absolute;
   top: -20px;

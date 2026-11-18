@@ -15,8 +15,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
-import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, jobInvoicesKey, readJobInvoices, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { useDocumentProfile } from '../../lib/companyBranding.ts'
+import { endSendIntent, sendIntent, sendKey, startInvoiceSend, startSend, useSendInFlight, type SendIntent } from '../../lib/invoiceSends.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { deletePayment } from '../../lib/stages.ts'
@@ -36,6 +37,7 @@ import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { useFhMotion } from '../../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../../components/v3'
 import { InvoiceTemplate } from '../../components/documents'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 /**
  * JobMoney, a job's money, reached at /jobs/:id?tab=financials only (the
@@ -90,13 +92,19 @@ function methodLabel(m: any) {
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
-export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
+export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged, jobMoney }: {
   /** The job (fh_contacts id). Falls back to the route's :id. */
   id?: string
   /** Records a payment against the job when no open draw is billing it. */
   onOpenLogPayment?: () => void
   /** The job page reloads its own money after a change here. */
   onChanged?: () => void
+  /**
+   * The payments, insurance claim and change orders the job page already
+   * read, so this screen does not read them again. onChanged must then
+   * reload them.
+   */
+  jobMoney?: { payments?: any[]; insurance?: any; changeOrders?: any[] }
 } = {}) {
   const params = useParams()
   const id = idProp ?? params.id
@@ -107,34 +115,35 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   // contact (owner-only RLS, null for partner viewers); change orders
   // (migration 019) bump the contract total when approved. Both come
   // back in the bundle below.
-  const { data: bundle, isPending: loading, isError, error: queryError } = useInvoiceDetail(id, user?.id)
+  const fromJob = !!jobMoney
+  const { data: bundle, isPending: loading, isError, error: queryError } = useInvoiceDetail(id, user?.id, { withMoney: !fromJob })
   const invalidateInvoiceDetail = useInvalidateInvoiceDetail()
   const queryClient = useQueryClient()
   // Refresh BOTH caches, a payment can settle the current draw
   // (stages.ts flips it to 'paid'), and refreshing only the contact
   // left the document view billing an already-paid draw until remount.
+  // The job page's reload (onChanged) reads the job's invoices too, since
+  // they sit under its key.
   const refresh = () => {
     invalidateInvoiceDetail(id)
-    queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] })
-    onChanged?.()
+    if (onChanged) onChanged()
+    else queryClient.invalidateQueries({ queryKey: jobInvoicesKey(id) })
   }
   const contact = bundle?.contact ?? null
-  const payments = useMemo(() => bundle?.payments ?? [], [bundle])
-  const insurance = bundle?.insurance ?? null
-  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
-  const error = isError ? (queryError?.message || 'Could not load invoice') : ''
+  const jobPayments = jobMoney?.payments
+  const jobChangeOrders = jobMoney?.changeOrders
+  const payments = useMemo(() => (fromJob ? jobPayments : bundle?.payments) ?? [], [fromJob, jobPayments, bundle])
+  const insurance = (fromJob ? jobMoney?.insurance : bundle?.insurance) ?? null
+  const changeOrders = useMemo(() => (fromJob ? jobChangeOrders : bundle?.changeOrders) ?? [], [fromJob, jobChangeOrders, bundle])
+  const error = isError ? plainError(queryError, 'Could not load the invoice. Check your connection and try again.') : ''
 
   // First-class invoice draws (fh_invoices) for this job. fh_contacts has
   // no due_at column, the real issue/due dates, invoice number, and the
   // billing schedule all live on these rows, so the on-screen document
   // and the emailed PDF stay in sync with the public link.
   const { data: invoiceRows = [] } = useQuery({
-    queryKey: ['invoiceDraws', id],
-    queryFn: async () => {
-      const { data, error: fetchErr } = await fetchInvoicesForContact(id as string)
-      if (fetchErr) throw fetchErr
-      return data
-    },
+    queryKey: jobInvoicesKey(id),
+    queryFn: () => readJobInvoices(id as string),
     enabled: !!id
   })
 
@@ -172,7 +181,13 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   // Send Invoice state, mirrors Send Proposal flow on the Quote tab.
   // Builds the PDF locally, uploads to job-files, posts the storage_path
   // to /api/send-invoice for on the server Resend send + activity log.
-  const [sending, setSending] = useState(false)
+  // The send is kept app wide (lib/invoiceSends), not in this screen: leave
+  // the tab while Email is still going out and come back, or open the same
+  // invoice on another screen, and it is still busy. This screen sends the
+  // open draw's email, else the job's Balance due.
+  const balanceSending = useSendInFlight(id ? sendKey.jobBalance(id) : null)
+  const drawSending = useSendInFlight(billingDraw ? sendKey.invoice(billingDraw.id) : null)
+  const sending = balanceSending || drawSending
   // Sent flag flips back to false after 2.4s so the Send button
   // briefly morphs to green ✓ "Sent" on success, mirrors the Compose
   // pattern. Gives the operator visual confirmation that's hard to
@@ -308,7 +323,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       downloadPdf(result)
       toastSuccess('Invoice PDF downloaded', result.filename)
     } catch (e: any) {
-      toastError("Couldn't generate PDF", e?.message || 'Try again')
+      toastError("Couldn't generate PDF", plainError(e, 'Try again.'))
     } finally {
       setGenerating(false)
     }
@@ -343,7 +358,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         toastSuccess('Share link ready', link.url)
       }
     } catch (e: any) {
-      toastError("Couldn't mint share link", e?.message || 'Try again.')
+      toastError("Couldn't mint share link", plainError(e, 'Try again.'))
     } finally {
       setSharing(false)
     }
@@ -355,8 +370,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   // shared sendInvoiceEmail, so the issue date, due date and status are
   // tracked like every other send. An untracked ad hoc PDF left no open
   // invoice behind and A/R aging fell back to the job's creation date.
-  async function sendTrackedBalanceInvoice() {
-    if (!contact) return
+  // Resolves true once the email has gone out.
+  async function sendTrackedBalanceInvoice(): Promise<boolean> {
+    if (!contact) return false
     const { data: rows, error: listErr } = await fetchInvoicesForContact(contact.id)
     if (listErr) throw new Error(listErr.message || "Couldn't load this job's invoices")
     const plan = pickBalanceInvoice({ invoices: rows, contractTotal: totals.amount, balance: totals.balance })
@@ -365,7 +381,14 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     if (plan.invoice) {
       invoice = plan.invoice
     } else {
+      // The new invoice's id is made once per send and kept app wide until
+      // the row is known to exist. A retry after a lost answer writes the
+      // same id, so it finds the first row (createInvoice reads it back)
+      // instead of billing the balance a second time.
+      const balanceKey = sendKey.jobBalance(contact.id)
+      const intent = sendIntent(balanceKey)
       const { data: created, error: createErr } = await createInvoice({
+        id: intent.id,
         contact,
         clientId: contact.client_id,
         userId: user!.id,
@@ -374,6 +397,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         due_at: new Date(Date.now() + 14 * 86400000).toISOString()
       })
       if (createErr || !created) throw new Error(createErr?.message || "Couldn't create the invoice")
+      endSendIntent(balanceKey, intent)
       invoice = created
     }
     const wasDraft = String(invoice.status || '').toLowerCase() === 'draft'
@@ -381,21 +405,31 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     if (wasDraft && (review.excess > 0 || review.duplicates.length)) {
       navigate(`/invoices/${invoice.id}`)
       toastError('Review this draft before sending', 'Check similar invoices and approved contract value.')
-      return
+      return false
     }
-    const res = await sendInvoiceEmail({
-      invoice,
-      // Same recipient block as this screen's own PDF (client fallbacks).
-      contact: { ...contact, name: resolved.name || contact.name, email: resolved.email, phone: resolved.phone, address: resolved.address },
-      company: await loadCompany(),
-      userId: user!.id,
-      recipientEmail: resolved.email,
-      payments,
-      changeOrders,
-      // The job's invoices, so this asks for what Money asks for on it.
-      invoices: rows,
-      insurance
-    })
+    // The draft can be going out from its own screen already.
+    const endInvoice = startInvoiceSend(invoice.id, { reminder: false })
+    if (!endInvoice) return false
+    let res
+    try {
+      res = await sendInvoiceEmail({
+        invoice,
+        // Same recipient block as this screen's own PDF (client fallbacks).
+        contact: { ...contact, name: resolved.name || contact.name, email: resolved.email, phone: resolved.phone, address: resolved.address },
+        company: await loadCompany(),
+        userId: user!.id,
+        recipientEmail: resolved.email,
+        payments,
+        changeOrders,
+        // The job's invoices, so this asks for what Money asks for on it.
+        invoices: rows,
+        insurance
+      })
+    } catch (e) {
+      endInvoice(false)
+      throw e
+    }
+    endInvoice(res.ok)
     if (res.ok) {
       // Name the bill that went out: it can be a draft draw rather than
       // the whole balance this screen showed.
@@ -414,6 +448,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       throw new Error(res.message || 'Send failed')
     }
     refresh()
+    return res.ok
   }
 
   async function handleSendInvoice() {
@@ -422,14 +457,26 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       toastError('Add a client email first', 'Open the linked client or job to add an email.')
       return
     }
-    setSending(true)
+    // One send of this bill at a time, from any screen: the open draw's
+    // email, else the job's Balance due. Read and set at once, so a second
+    // tap in the same frame sends nothing.
+    const draw = billingDraw
+    const end = draw ? startInvoiceSend(draw.id, { reminder: false }) : startSend(sendKey.jobBalance(contact.id))
+    if (!end) return
+    let delivered = false
     try {
-      if (!billingDraw && totals.balance > 0.5) {
-        await sendTrackedBalanceInvoice()
+      if (!draw && totals.balance > 0.5) {
+        delivered = await sendTrackedBalanceInvoice()
         return
       }
       const { generateInvoice, downloadPdf } = await loadPdf()
-      const result = await generateInvoice({
+      // One send id per send of the open draw, kept for every retry until
+      // the email goes out or the draw, its amount due or its recipient
+      // changes. A retry sends the same id and the PDF the first try
+      // uploaded, so the customer gets one email (lib/invoiceSends).
+      const intentKey = draw ? sendKey.invoice(draw.id) : null
+      const intent: SendIntent | null = intentKey && draw ? sendIntent(intentKey, JSON.stringify([draw.updated_at, resolved.email, amountDueNow])) : null
+      const buildPdf = async () => generateInvoice({
         company: await loadCompany(),
         contact: {
           id: contact.id,
@@ -457,30 +504,37 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         invoices: invoiceRows,
         currentInvoice: billingDraw
       })
-      if (!result?.doc) throw new Error('PDF generator returned no document')
+      let result: any = null
+      let file = intent?.upload ?? null
+      if (!file) {
+        result = await buildPdf()
+        if (!result?.doc) throw new Error('PDF generator returned no document')
 
-      // Upload to job-files so the server can pull it with service role.
-      const blob = result.doc.output('blob')
-      const rowId = createUuid()
-      const path = `${user!.id}/${contact.id}/${rowId}.pdf`
-      const { error: upErr } = await supabase.storage
-        .from('job-files')
-        .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
-      // Audit row (best-effort).
-      try {
-        await supabase.from('fh_job_files').insert({
-          id: rowId,
-          user_id: user!.id,
-          job_id: contact.id,
-          filename: result.filename,
-          storage_path: path,
-          mime_type: 'application/pdf',
-          size_bytes: blob.size || 0,
-          kind: 'file'
-        })
-      } catch (e: any) {
-        console.warn('[invoice] fh_job_files row insert failed', e)
+        // Upload to job-files so the server can pull it with service role.
+        const blob = result.doc.output('blob')
+        const rowId = createUuid()
+        const path = `${user!.id}/${contact.id}/${rowId}.pdf`
+        const { error: upErr } = await supabase.storage
+          .from('job-files')
+          .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+        if (upErr) throw new Error(plainError(upErr, 'The invoice PDF could not be saved, so nothing was sent. Try again.'))
+        file = { path, filename: result.filename as string }
+        if (intent) intent.upload = file
+        // Audit row (best-effort).
+        try {
+          await supabase.from('fh_job_files').insert({
+            id: rowId,
+            user_id: user!.id,
+            job_id: contact.id,
+            filename: result.filename,
+            storage_path: path,
+            mime_type: 'application/pdf',
+            size_bytes: blob.size || 0,
+            kind: 'file'
+          })
+        } catch (e: any) {
+          console.warn('[invoice] fh_job_files row insert failed', e)
+        }
       }
 
       const sendRes = await fetch('/api/send-invoice', {
@@ -493,8 +547,9 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
           sender_user_id: user!.id,
           recipient_email: resolved.email,
           recipient_name: resolved.name || null,
-          storage_path: path,
-          filename: result.filename,
+          storage_path: file.path,
+          filename: file.filename,
+          ...(intent ? { send_id: intent.id } : {}),
           amount_due: amountDueNow
         })
       })
@@ -503,29 +558,27 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
         toastError(
           "Email not sent, sender isn't configured",
-          'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
+          'Downloaded the PDF so you can email it manually.'
         )
-        downloadPdf(result)
+        downloadPdf(result ?? await buildPdf())
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        // Surface the actual provider error (Resend message + HTTP status)
-        // so the operator sees exactly why the send failed instead of
-        // hunting through Netlify function logs. Was previously hidden
-        // behind a generic "Email send failed." string.
-        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-        throw new Error(`Resend rejected${status}: ${detail}`)
+        // The provider's words and status go to the log; the owner reads
+        // what did not happen and what to do (raw-errors-7).
+        throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The invoice was not sent. Try again.'))
       }
 
-      toastSuccess(`Invoice sent to ${resolved.email}`, result.filename)
+      if (intentKey && intent) endSendIntent(intentKey, intent)
+      toastSuccess(`Invoice sent to ${resolved.email}`, file.filename)
       setSent(true)
       setTimeout(() => setSent(false), 2400)
       refresh()
+      delivered = true
     } catch (e: any) {
-      toastError("Couldn't send invoice", e?.message || 'Try again')
+      toastError("Couldn't send invoice", plainError(e, 'The invoice was not sent. Try again.'))
     } finally {
-      setSending(false)
+      end(delivered)
     }
   }
 
@@ -555,7 +608,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     const res = contact ? await deletePayment(contact as any, paymentId) : null
     setDeletingId(null)
     if (!res || res.error) {
-      toastError("Couldn't delete payment", res?.error?.message || 'This job is not loaded yet. Try again.')
+      toastError("Couldn't delete payment", plainError(res?.error, 'This job is not loaded yet. Try again.'))
       refresh()
       return
     }

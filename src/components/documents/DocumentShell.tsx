@@ -31,6 +31,7 @@
 import './documents-responsive.css'
 import DocumentLogo from './DocumentLogo.tsx'
 import { DOC_COLORS, DOC_FONTS, DOC_SPACE, resolveBrandGold } from './tokens.ts'
+import { formatPhone } from '../../lib/utils.ts'
 
 /**
  * @param {object}    props
@@ -60,7 +61,7 @@ export default function DocumentShell({
   footer
 }: any) {
   const brand = resolveBrandGold(company)
-  const contactLine = [company?.phone, company?.email, company?.website].filter(Boolean).join('  ·  ')
+  const contactLine = [formatPhone(company?.phone), company?.email, company?.website].filter(Boolean).join('  ·  ')
 
   return (
     <article
@@ -130,7 +131,7 @@ export default function DocumentShell({
           )}
           <p style={{ margin: footer ? '10px 0 0' : 0, fontSize: 12, lineHeight: 1.55, color: DOC_COLORS.inkMuted }}>
             {company?.name || ''}
-            {contactLine ? `${company?.name ? ', ' : ''}Questions? ${contactLine}` : ''}
+            {contactLine ? `${company?.name ? '. ' : ''}Questions? ${contactLine}` : ''}
           </p>
         </footer>
       </div>
@@ -278,7 +279,7 @@ function PartiesRow({ recipient, recipientLabel, project }: any) {
         name={recipient?.name}
         lines={[
           recipient?.address,
-          [recipient?.phone, recipient?.email].filter(Boolean).join(' · ')
+          [formatPhone(recipient?.phone), recipient?.email].filter(Boolean).join(' · ')
         ].filter(Boolean)}
       />
       {project && (

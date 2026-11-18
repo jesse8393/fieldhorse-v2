@@ -5,13 +5,14 @@ import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useProfile } from '../contexts/ProfileContext.tsx'
 import { weatherQuery } from '../lib/weather.ts'
-import { answerRepairPath, currentForecast } from '../lib/todayView.ts'
+import { answerRemindPath, answerRepairPath, currentForecast } from '../lib/todayView.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { useHomeDashboard, useHomeDashboardRealtime } from '../lib/homeDashboard.ts'
 import type { HomeNextAction } from '../lib/homeDashboard.ts'
 import { lazyWithRetry } from '../lib/lazyWithRetry.ts'
 import { recordRoute } from '../lib/records.ts'
 import TodayPhone from './today/TodayPhone.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 // Lazy, desktop-only variant. Home itself is an eager route (loaded
 // with the main bundle) so any static import here ships SnowHome to
 // mobile users too even though they never render it. Lazy keeps the
@@ -45,17 +46,15 @@ export default function Home() {
   })
   const forecast = currentForecast(weather.data, weather.dataUpdatedAt, now)
   const [pinError, setPinError] = useState('')
-  const forecastError = pinError || (weather.error ? weather.error.message || 'Forecast unavailable' : '')
+  const forecastError = pinError || (weather.error ? 'Forecast unavailable' : '')
 
   const membership = useMembership()
   const dashboard = useHomeDashboard(user?.id, membership.orgId)
   useHomeDashboardRealtime(user?.id, membership.orgId)
   const dashboardData = dashboard.data
-  const dashboardError = dashboard.error instanceof Error
-    ? dashboard.error.message
-    : dashboard.error
-      ? 'Dashboard data could not refresh.'
-      : ''
+  // The thrown message names the query for the logs; the card says what
+  // to do in plain words (raw-errors-5).
+  const dashboardError = dashboard.error ? plainError(dashboard.error, 'Check your connection and tap Retry.') : ''
 
   function pinLocation() {
     if (!('geolocation' in navigator)) return setPinError('Geolocation not supported')
@@ -153,6 +152,8 @@ function jobActionPath(contactId: any, tab?: any, intent?: any) {
 function nextActionPath(action: HomeNextAction) {
   const repair = answerRepairPath(action)
   if (repair) return repair
+  const remind = answerRemindPath(action)
+  if (remind) return remind
   if (action?.recordKind === 'lead' || action?.recordKind === 'quote') return recordRoute(action.recordKind, action.recordId)
   if (!action?.contactId) return '/jobs'
   return jobActionPath(action.contactId, action.tab, action.intent)

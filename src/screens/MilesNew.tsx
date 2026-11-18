@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Field } from '../components/fh'
-import CreateShell from './new/CreateShell.tsx'
+import CreateShell, { useDraft } from './new/CreateShell.tsx'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
 import { MOVED_STAGE_FILTER } from '../lib/stages.ts'
@@ -16,6 +16,8 @@ import { todayYmd } from '../lib/dates.ts'
 import { toastError, toastSuccess } from '../lib/toast.ts'
 import { hapticMedium } from '../lib/haptics.ts'
 import { businessMileageRate, mileageRateNote } from '../lib/mileageRates.ts'
+import { plainError } from '../lib/serviceErrors.ts'
+import { moneyCents } from '../lib/format.ts'
 
 // The IRS rate depends on the date of the drive, from the same table
 // Reports reads, so the screen and the yearly total always agree.
@@ -28,10 +30,15 @@ export default function MilesNew() {
   const navigate = useNavigate()
   const refresh = useInvalidateAnalytics()
   const today = useMemo(() => todayYmd(), [])
-  const [droveOn, setDroveOn] = useState(today)
-  const [miles, setMiles] = useState('')
-  const [purpose, setPurpose] = useState('')
-  const [contactId, setContactId] = useState('')
+  // What is typed stays on the device until the save lands (D23). An
+  // empty date means today, so a draft never pins an old day.
+  const { form, set, done } = useDraft('miles', { droveOn: '', miles: '', purpose: '', contactId: '' })
+  const droveOn = form.droveOn || today
+  const { miles, purpose, contactId } = form
+  const setDroveOn = (value: string) => set('droveOn', value)
+  const setMiles = (value: string) => set('miles', value)
+  const setPurpose = (value: string) => set('purpose', value)
+  const setContactId = (value: string) => set('contactId', value)
   const [contacts, setContacts] = useState<{ id: string; name: string | null }[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>()
@@ -73,10 +80,11 @@ export default function MilesNew() {
     })
     if (err) {
       setSaving(false)
-      setError(err.message || 'The miles were not saved.')
-      toastError("Couldn't log miles", err.message || 'Try again in a moment.')
+      setError(plainError(err, 'The miles were not saved. Try again.', { kept: true }))
+      toastError("Couldn't log miles", plainError(err, 'Try again in a moment.'))
       return
     }
+    done()
     hapticMedium()
     toastSuccess('Miles logged', 'Deduction updated')
     refresh()
@@ -109,7 +117,7 @@ export default function MilesNew() {
         min="0"
         placeholder="0"
         value={miles}
-        helper={milesNum > 0 && deduction != null ? `Deduction $${deduction.toFixed(2)}` : undefined}
+        helper={milesNum > 0 && deduction != null ? `Deduction ${moneyCents(deduction)}` : undefined}
         error={milesError}
         onChange={(e) => { setMiles(e.target.value); setError(undefined); setMilesError(undefined) }}
       />

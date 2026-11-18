@@ -465,6 +465,23 @@ test('Back from the question form never approves, even with the approval filled 
   expect(spies.requestChanges).toHaveLength(0)
 })
 
+// raw-errors-8: on a weak signal the homeowner was told "Failed to fetch".
+test('approving or asking on a weak signal tells the homeowner in plain words', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload())
+  await context.route('**/api/public-link-approve', (route) => route.abort('failed'))
+  await context.route('**/api/public-link-request-changes', (route) => route.abort('failed'))
+  await openPortal(page)
+  await fillApproval(page)
+  await page.getByRole('button', { name: 'Approve this quote' }).click()
+  const alert = page.getByRole('alert')
+  await expect(alert).toHaveText('We could not reach Parker Construction just now. Check your connection and tap Approve this quote again. Nothing was approved yet.')
+
+  await page.getByRole('button', { name: 'Ask Parker a question first' }).click()
+  await page.getByLabel('Changes needed').fill('Please move the pour to Friday.')
+  await page.getByRole('button', { name: 'Send request' }).click()
+  await expect(alert).toHaveText('We could not reach Parker Construction just now. Check your connection and tap Send request again. Your request was not sent yet.')
+})
+
 test('what happens next is three numbered steps', async ({ page, context }) => {
   await mockPortal(context, proposalPayload())
   await openPortal(page)
@@ -562,6 +579,31 @@ test('a quote without the Fieldhorse theme keeps its own look (decision D13)', a
   await expect(page.getByRole('button', { name: 'Approve & notify contractor' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Hi Marco, your quote is ready.' })).toHaveCount(0)
   await expect(page.getByText('Powered by Fieldhorse')).toHaveCount(0)
+})
+
+// The classic bar's authority checkbox and approve button wore the gold the
+// brand retired. Both take the brand copper now, with white text on the
+// button so it stays readable (vibe audit purple-1).
+test('the classic approve bar wears the brand copper', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ company: { estimate_template: 'classic' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  const approve = page.getByRole('button', { name: 'Approve & notify contractor' })
+  await expect(approve).toBeVisible()
+  const box = page.getByRole('checkbox', { name: /I have the authority/ })
+  const gold = await page.evaluate(() => {
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--fh-gold)'
+    document.body.appendChild(probe)
+    const resolved = getComputedStyle(probe).color
+    probe.remove()
+    return resolved
+  })
+  expect(gold).toBe('rgb(173, 64, 41)')
+  expect(await box.evaluate((el) => getComputedStyle(el).accentColor)).toBe(gold)
+  const look = await approve.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, image: getComputedStyle(el).backgroundImage, color: getComputedStyle(el).color }))
+  expect(look.image).toBe('none')
+  expect(look.bg).toBe(gold)
+  expect(look.color).toBe('rgb(255, 255, 255)')
 })
 
 test('a quote with no template set keeps resolving to classic (decision D13)', async ({ page, context }) => {
@@ -1843,4 +1885,68 @@ test('the editorial theme prints the scope of work once', async ({ page, context
   await mockPortal(context, proposalPayload({ company: { estimate_template: 'editorial' }, contact: { scope_text: 'Pour a 4 inch slab with a broom finish.' } }))
   await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
   await expect(page.getByText('Pour a 4 inch slab with a broom finish.')).toHaveCount(1)
+})
+
+/* ---- One record reads the same on the link as on the PDF (formats) ---- */
+
+test('whole amounts keep .00 on the invoice link, the way the PDF prints them (formats-6)', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { amount: 12800 },
+    invoices: [draw('inv-w1', 1, 6400, 'paid'), draw('inv-w2', 2, 6400, 'sent')],
+    payments: [{ id: 'pay-w1', contact_id: 'job-linked-0003', invoice_id: 'inv-w1', amount: 6400, paid_on: '2026-11-11', method: 'check', kind: 'deposit' }]
+  }))
+  await openInvoice(page)
+  await expect(page.getByTestId('invoice-amount-due')).toHaveText('$6,400.00')
+  await expect(page.getByText('$6,400.00 of $12,800.00 collected')).toBeVisible()
+  const text = await page.locator('body').innerText()
+  expect(text).not.toMatch(/\$[\d,]+(?![\d,]*\.\d\d)\b/)
+})
+
+test('phone numbers on the invoice link read the way the app prints them (formats-10)', async ({ page, context }) => {
+  await mockPortal(context, invoicePayload({
+    contact: { phone: '6155550101', email: 'dana@example.com' },
+    company: { phone: '6155550100', email: 'office@parker.co' },
+    invoices: [draw('inv-ph', 1, 5000, 'sent')]
+  }))
+  await openInvoice(page)
+  await expect(page.getByText('(615) 555-0101 · dana@example.com').first()).toBeVisible()
+  await expect(page.getByText(/\(615\) 555-0100/).first()).toBeVisible()
+  expect(await page.locator('body').innerText()).not.toMatch(/615555010[01]/)
+})
+
+test.describe('a customer on Eastern time (formats-2)', () => {
+  test.use({ timezoneId: 'America/New_York' })
+  test('the invoice link shows the due and issue dates the company set', async ({ page, context }) => {
+    // Sent Mon Nov 9 at 11:30 pm Central; due Tue Nov 24, stored at the end
+    // of that day in Central time, the way the job's Invoices tab stores it.
+    await mockPortal(context, invoicePayload({
+      company: { timezone: 'America/Chicago' },
+      invoices: [draw('inv-tz', 1, 5000, 'sent', { issued_at: '2026-11-10T05:30:00Z', due_at: '2026-11-25T05:59:59.999Z' })]
+    }))
+    await openInvoice(page)
+    const text = await page.locator('body').innerText()
+    expect(text).toContain('Due November 24, 2026')
+    expect(text).toContain('November 9, 2026')
+    expect(text).not.toContain('November 25, 2026')
+    expect(text).not.toContain('November 10, 2026')
+  })
+
+  for (const template of ['fieldhorse', 'classic']) {
+    test(`the ${template} quote link shows the issue and expiry days the company set`, async ({ page, context }) => {
+      await page.clock.setFixedTime(new Date('2026-11-17T16:00:00Z'))
+      // Made Mon Nov 9 at 11:30 pm Central; valid through Dec 9, stored at
+      // the end of that day in Central time.
+      await mockPortal(context, proposalPayload({
+        company: { timezone: 'America/Chicago', estimate_template: template },
+        contact: { created_at: '2026-11-10T05:30:00Z', quote_sent_at: '2026-11-10T05:30:00Z', quote_expires_at: '2026-12-10T05:59:59.999Z' }
+      }))
+      await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+      await expect(page.getByText('Pool deck pour').first()).toBeVisible()
+      const text = await page.locator('body').innerText()
+      expect(text).toMatch(/November 9\b/)
+      expect(text).toMatch(/December 9\b/)
+      expect(text).not.toMatch(/November 10\b/)
+      expect(text).not.toMatch(/December 10\b/)
+    })
+  }
 })

@@ -17,6 +17,8 @@ import {
   Eyebrow
 } from '../../../components/v3'
 import TimeClockCard from '../../../components/TimeClockCard.tsx'
+import DraftRestored from '../../../components/DraftRestored.tsx'
+import { useEditDraft } from '../../../lib/useEditDraft.ts'
 import { computeJobHealth } from '../lib/jobHealth.ts'
 import ActivityLog from '../sections/ActivityLog.tsx'
 import { resolvePrimaryAction, resolveNextAction, type JobNextAction } from '../lib/jobNextAction.ts'
@@ -27,6 +29,7 @@ import SpineList from '../phone/SpineList.tsx'
 import TodosSection from '../sections/Todos.tsx'
 import JobVisitSummary from '../../../components/fh/JobVisitSummary.tsx'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 /**
  * v3 OVERVIEW tab, the "money screen" of the Job Detail.
@@ -162,7 +165,7 @@ export default function OverviewTab({
             .eq('id', todoId)
             .select('id')
           if (error || !updated || updated.length === 0) {
-            toastError("Couldn't mark task done", error?.message || 'This task may have been removed. Refresh and try again.')
+            toastError("Couldn't mark task done", plainError(error, 'This task may have been removed. Refresh and try again.'))
             await fetchAll() // roll the optimistic flip back
           } else {
             toastSuccess('Task complete')
@@ -229,7 +232,7 @@ export default function OverviewTab({
           onOpenAddEvent?.()
       }
     } catch (e: any) {
-      toastError("Couldn't complete action", e?.message || 'Unknown error')
+      toastError("Couldn't complete action", plainError(e, 'Try again.'))
     } finally {
       setActionLoading(false)
     }
@@ -364,7 +367,7 @@ export default function OverviewTab({
       {/* PROGRESS, milestone completion (execution stages only) */}
       {isExecutionStage && (
         <ProgressMeter
-          label="Job Progress"
+          label="Job progress"
           value={milestonePct}
           caption={milestones.length
             ? `${milestones.filter((m: any) => m.done).length} of ${milestones.length} ${countNoun(milestones.length, 'milestone')} complete`
@@ -555,10 +558,13 @@ const EDITABLE_FIELDS = [
 ]
 
 function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = false }: any) {
-  // Snapshot of the row when editing starts. The parent keys this card by
-  // job id, so another job remounts it with fresh values, and a realtime
-  // refetch mid edit never wipes what the operator typed.
-  const [form, setForm] = useState(() => buildForm(contact))
+  // The row's values until the operator changes one; from then on the
+  // edits are a draft kept on the device per job (D23), so a tap on
+  // another section, a reload or a realtime refetch never wipes them. The
+  // parent keys this card by job id.
+  const draft = useEditDraft<Record<string, any>>(`edit:job-details:${contact?.id}`, buildForm(contact))
+  const form = draft.form
+  const setForm = draft.update
   const [saving, setSaving] = useState(false)
   const [clientCreating, setClientCreating] = useState(false)
   const clientCreatingRef = useRef(false)
@@ -595,6 +601,8 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
   useEffect(() => { if (saveError) errorRef.current?.focus() }, [saveError, saveAttempt])
 
   function exitEdit() {
+    // Cancelled, or saved: the edits are no longer needed.
+    draft.done()
     onExitEdit?.()
     requestAnimationFrame(() => {
       const heading = document.querySelector<HTMLElement>('main h1')
@@ -800,6 +808,7 @@ function EditFieldsCard({ contact, patch, onExitEdit, userId, canEditAmount = fa
         </span>
       </div>}
 
+      {draft.restored && <DraftRestored onDiscard={draft.discard} />}
       {saveError && <div ref={errorRef} tabIndex={-1} role="alert" style={{ borderLeft: '3px solid var(--v3-danger)', padding: '8px 12px', scrollMarginTop: 96 }}>{saveError}</div>}
       {clientCreating && <p role="status" style={{ margin: 0 }}>Adding client. Save changes will be available when this finishes.</p>}
 

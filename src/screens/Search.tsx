@@ -18,6 +18,7 @@ import { universalSearch, type SearchResults } from '../lib/universalSearch.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { useOrgScope, type OrgScope } from '../lib/orgScope.ts'
+import { useDocumentCompanyName } from '../lib/companyBranding.ts'
 import type { OrgRole } from '../lib/permissions.ts'
 import Field from '../components/fh/Field.tsx'
 import Icon from '../components/fh/Icon.tsx'
@@ -49,6 +50,8 @@ export default function Search() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const orgScope = useOrgScope(user?.id)
+  // Invoices are found and shown by their printed number (formats-1).
+  const companyName = useDocumentCompanyName(orgScope)
   const { role, canSeeAllJobs, loading: membershipLoading, error: membershipError, refresh: refreshMembership } = useMembership()
   const [query, setQuery] = useState('')
   // null while idle, a result set once a query has been answered.
@@ -76,7 +79,7 @@ export default function Search() {
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const data = await universalSearch(q, user.id, orgScope, role)
+        const data = await universalSearch(q, user.id, orgScope, role, companyName)
         if (!cancelled) setSnapshot({ userId: user.id, scope: orgScope, role, query: q, data })
       } catch {
         if (!cancelled) {
@@ -88,7 +91,7 @@ export default function Search() {
       }
     }, DEBOUNCE_MS)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [query, user?.id, orgScope, role, membershipLoading, membershipError, retryTick])
+  }, [query, user?.id, orgScope, role, companyName, membershipLoading, membershipError, retryTick])
 
   function goBack() {
     hapticTap()

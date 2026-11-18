@@ -315,6 +315,10 @@
   --v3-gutter: 24px;
 
   color-scheme: light;
+  /* Every native checkbox, radio, range and progress control takes the
+     brand copper instead of the browser's stock blue. It inherits, and
+     Night's --fh-gold resolves here too, so one rule covers both themes. */
+  accent-color: var(--fh-gold);
 }
 
 /* ---- Night (spec 5.5). Only --fh- values change; the legacy names

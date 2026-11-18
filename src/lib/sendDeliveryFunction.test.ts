@@ -73,6 +73,41 @@ describe('the email senders', () => {
       expect(keys[2]).not.toBe(keys[0])
     })
 
+    if (name !== 'send-message') {
+      // The screen makes one send id per send and keeps it for every retry
+      // of it, with a new PDF or the same one. The provider key follows the
+      // send id, not the PDF's path, so "Try again" after an unclear failure
+      // never mails the customer twice; a new send id is a new email
+      // (double-tap-3, double-tap-7).
+      it(`${name} repeats a send with the same send id under the same key, even with a new PDF`, async () => {
+        const send = await handler(s.file)
+        const tries = [
+          { pdf: path('a'), send_id: '5d2f8a1e-0c4b-4f7e-9a61-3b8e2d7c1f00' },
+          { pdf: path('b'), send_id: '5d2f8a1e-0c4b-4f7e-9a61-3b8e2d7c1f00' },
+          { pdf: path('b'), send_id: '9e0c6b47-21aa-4d3f-8c55-7f1e4a2b9d11' }
+        ]
+        for (const t of tries) {
+          seed()
+          expect((await send(post(`/api/${name}`, { ...s.body(t.pdf), send_id: t.send_id }))).status).toBe(200)
+        }
+        const keys = outbound.filter((o) => o.host === 'api.resend.com').map(keyOf)
+        expect(keys).toHaveLength(3)
+        expect(keys[0]).toMatch(/^[\w./-]{8,256}$/)
+        expect(keys[1], 'a retry of the same send').toBe(keys[0])
+        expect(keys[2], 'a new send').not.toBe(keys[0])
+      })
+
+      it(`${name} reads a send id that is not a plain id as none`, async () => {
+        const send = await handler(s.file)
+        for (const pdf of [path('a'), path('b')]) {
+          seed()
+          expect((await send(post(`/api/${name}`, { ...s.body(pdf), send_id: { not: 'an id' } }))).status).toBe(200)
+        }
+        const keys = outbound.filter((o) => o.host === 'api.resend.com').map(keyOf)
+        expect(keys[1]).not.toBe(keys[0])
+      })
+    }
+
     it(`${name} answers a JSON error when the mail provider cannot be reached`, async () => {
       const send = await handler(s.file)
       vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('fetch failed') }))

@@ -50,11 +50,14 @@ export const WARRANTY_PRESETS = [
 // Load any existing closeout for a job. Returns null when none.
 export async function loadCloseout({ userId, contactId }: { userId: string | undefined; contactId: string | undefined }) {
   if (!userId || !contactId) return null
-  const { data } = await supabase
+  // A failed read throws, so the screen can tell it from a job with no
+  // closeout on file.
+  const { data, error } = await supabase
     .from('fh_closeouts')
     .select('*')
     .eq('contact_id', contactId)
     .maybeSingle()
+  if (error) throw error
   return data || null
 }
 

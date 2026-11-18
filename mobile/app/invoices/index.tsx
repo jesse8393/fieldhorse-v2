@@ -1,6 +1,6 @@
 // mobile/app/invoices.tsx, Invoices & Payments hub.
 // Money-owed summary with aging buckets + an outstanding list with
-// working Mark Paid / Email. Reads real fh_invoices + payments.
+// working Mark paid and Email. Reads real fh_invoices + payments.
 import { useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -67,9 +67,9 @@ export default function InvoicesScreen() {
                   <View style={{ flex: Math.max(0.0001, 1 - (buckets[0] + buckets[1] + buckets[2]) / bucketMax) }} />
                 </View>
                 <View style={{ flexDirection: 'row', marginTop: 12 }}>
-                  <Bucket label="Current · 0–30D" value={full(buckets[0])} tone={theme.ink} />
-                  <Bucket label="Late · 31–60D" value={full(buckets[1])} tone="#C9963A" />
-                  <Bucket label="Overdue · 60+D" value={full(buckets[2])} tone={theme.danger} />
+                  <Bucket label="Current · 0 to 30 days" value={full(buckets[0])} tone={theme.ink} />
+                  <Bucket label="Late · 31 to 60 days" value={full(buckets[1])} tone="#C9963A" />
+                  <Bucket label="Overdue · over 60 days" value={full(buckets[2])} tone={theme.danger} />
                 </View>
                 <View style={{ borderTopWidth: 1, borderTopColor: theme.border, marginTop: 14, paddingTop: 12 }}>
                   <Text style={{ color: theme.inkMuted, fontSize: 14 }}>
@@ -92,7 +92,7 @@ export default function InvoicesScreen() {
             </View>
 
             {shown.length === 0 ? (
-              <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 12 }}>{tab === 'outstanding' ? 'Nothing outstanding, all caught up.' : 'No invoices yet.'}</Text>
+              <Text style={{ color: theme.inkMuted, fontSize: 14, marginTop: 12 }}>{tab === 'outstanding' ? 'Nothing outstanding. All caught up.' : 'No invoices yet.'}</Text>
             ) : (
               <View style={{ gap: 12 }}>
                 {shown.map((inv) => {
@@ -121,7 +121,7 @@ export default function InvoicesScreen() {
                             <Pressable disabled={pending.has(`invoice:${inv.id}`)} onPress={() => user && run(`invoice:${inv.id}`, "Couldn't mark invoice paid", () => markPaid({ id: inv.id, userId: user.id }))} style={{ flex: 1, borderRadius: 10, overflow: 'hidden' }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, backgroundColor: theme.goldBright }}>
                                 <DollarSign color={theme.onGold} size={14} />
-                                <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Mark Paid</Text>
+                                <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Mark paid</Text>
                               </View>
                             </Pressable>
                           </View>

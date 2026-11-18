@@ -17,10 +17,14 @@ import {
   loadCloseout, saveCloseout, clearCloseout, snapshotJobTotals, closeoutBalance
 } from '../../lib/closeout.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
+import { useEditDraft } from '../../lib/useEditDraft.ts'
+import DraftRestored from '../../components/DraftRestored.tsx'
 import { hapticError, hapticSuccess } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { useSecondTap } from '../../lib/secondTap.ts'
+import { endSendIntent, sendIntent, sendKey, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
 import { JobScreenFallback, money, useJobScreen } from './jobScreen.tsx'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // The pdf chunk is large and only needed for a certificate.
 async function loadPdf(): Promise<any> {
@@ -49,20 +53,35 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
   const [warrantyMonths, setWarrantyMonths] = useState('12')
   const [signoffMethod, setSignoffMethod] = useState('verbal')
   const [signoffName, setSignoffName] = useState(contact.name || '')
-  const [notes, setNotes] = useState('')
+  // The closing note stays on the device until the closeout is saved, so a
+  // reload keeps it (D23). It starts from the closeout on file, once read.
+  // When the closeout could not be read, the note on file is not known, so
+  // a kept note is neither compared with a guess nor written over.
+  const [readFailed, setReadFailed] = useState(false)
+  const closing = useEditDraft(loading || readFailed ? null : `edit:closeout:${contact.id}`, { notes: existing?.notes || '' })
+  const notes = closing.form.notes
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
+  // The certificate email is kept app wide (lib/invoiceSends), not in this
+  // screen: leave the closeout while it is still going out and come back,
+  // and it is still busy.
+  const certificateOut = useSendInFlight(sendKey.certificate(contact.id))
   const [error, setError] = useState<string | undefined>()
   const reopenTap = useSecondTap()
 
   useEffect(() => {
     let alive = true
     setLoading(true)
+    setReadFailed(false)
     void Promise.all([
-      loadCloseout({ userId, contactId: contact.id }),
+      loadCloseout({ userId, contactId: contact.id }).then(
+        (row) => ({ row, failed: false }),
+        () => ({ row: null, failed: true }),
+      ),
       snapshotJobTotals({ userId, contactId: contact.id })
-    ]).then(([row, snap]) => {
+    ]).then(([{ row, failed }, snap]) => {
       if (!alive) return
+      setReadFailed(failed)
       setExisting(row || null)
       setTotals(snap)
       if (row) {
@@ -70,7 +89,6 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
         setWarrantyMonths(String(row.warranty_months ?? 12))
         setSignoffMethod(row.signoff_method || 'verbal')
         setSignoffName(row.signoff_name || '')
-        setNotes(row.notes || '')
       }
       setLoading(false)
     }).catch(() => { if (alive) setLoading(false) })
@@ -104,12 +122,13 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
         }
       })
       hapticSuccess()
+      closing.done()
       toastSuccess(onFile ? 'Closeout updated' : 'Job marked complete', signoffName ? `Signed off by ${signoffName.trim()}` : 'Closeout recorded')
       await data.fetchAll()
       goBack()
     } catch (e) {
       hapticError()
-      const message = (e as { message?: string })?.message || 'Unknown error'
+      const message = plainError(e, 'The closeout was not saved. Try again.', { kept: true })
       setError(message)
       toastError("Couldn't save closeout", message)
       setSaving(false)
@@ -131,7 +150,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
           goBack()
         } catch (e) {
           hapticError()
-          toastError("Couldn't reopen", (e as { message?: string })?.message || 'Unknown error')
+          toastError("Couldn't reopen", plainError(e, 'Try again.'))
           setBusy(false)
         }
       })()
@@ -164,7 +183,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       toastSuccess('Certificate ready', result.filename)
     } catch (e) {
       hapticError()
-      toastError("Couldn't build certificate", (e as { message?: string })?.message || 'Unknown error')
+      toastError("Couldn't build certificate", plainError(e, 'Try again.'))
     } finally {
       setBusy(false)
     }
@@ -178,44 +197,62 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       toastError('Add a client email first', 'Open the client to add an email, then send again.')
       return
     }
+    const key = sendKey.certificate(contact.id)
+    const end = startSend(key)
+    if (!end) return
+    let sent = false
     setBusy(true)
     try {
       // The PDF is built here and saved to job-files, so the server can
-      // attach it; the row on fh_job_files shows it on the Files tab.
+      // attach it; the row on fh_job_files shows it on the Files tab. One
+      // send id per send, kept with the PDF the first try uploaded for every
+      // retry until the email goes out or the closeout or recipient change,
+      // so the customer gets one email (lib/invoiceSends).
       const { generateCertificate, downloadPdf } = await loadPdf()
-      const result = await generateCertificate({ company: await companyPayload(), contact, closeout: existing })
-      const blob = result.doc.output('blob')
-      const rowId = createUuid()
-      const path = `${userId}/${contact.id}/${rowId}.pdf`
-      const { error: upErr } = await supabase.storage.from('job-files').upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the certificate PDF: ${upErr.message}`)
-      try {
-        await supabase.from('fh_job_files').insert({
-          id: rowId, user_id: userId, job_id: contact.id, filename: result.filename,
-          storage_path: path, mime_type: 'application/pdf', size_bytes: blob.size || 0, kind: 'file'
-        })
-      } catch { /* the file itself landed; the send does not need the index row */ }
+      const build = async () => generateCertificate({ company: await companyPayload(), contact, closeout: existing })
+      const intent = sendIntent(key, JSON.stringify([recipient, existing]))
+      let result: any = null
+      let file = intent.upload
+      if (!file) {
+        result = await build()
+        const blob = result.doc.output('blob')
+        const rowId = createUuid()
+        const path = `${userId}/${contact.id}/${rowId}.pdf`
+        const { error: upErr } = await supabase.storage.from('job-files').upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+        if (upErr) throw new Error(plainError(upErr, 'The certificate PDF could not be saved, so nothing was sent. Try again.'))
+        file = { path, filename: result.filename as string }
+        intent.upload = file
+        try {
+          await supabase.from('fh_job_files').insert({
+            id: rowId, user_id: userId, job_id: contact.id, filename: result.filename,
+            storage_path: path, mime_type: 'application/pdf', size_bytes: blob.size || 0, kind: 'file'
+          })
+        } catch { /* the file itself landed; the send does not need the index row */ }
+      }
       const sendRes = await fetch('/api/send-certificate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           contact_id: contact.id, sender_user_id: userId, recipient_email: recipient,
-          recipient_name: contact.name || null, storage_path: path, filename: result.filename
+          recipient_name: contact.name || null, storage_path: file.path, filename: file.filename, send_id: intent.id
         })
       })
       const sendBody = await sendRes.json().catch(() => ({}))
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
-        toastError('Email is not set up yet', 'The PDF is saved to Files, share it yourself.')
-        downloadPdf(result)
+        toastError('Email is not set up yet', 'The PDF is saved to Files. Share it from there.')
+        downloadPdf(result ?? await build())
         return
       }
-      if (!sendRes.ok || !sendBody?.ok) throw new Error(sendBody?.detail || sendBody?.error || 'The email did not go out.')
+      if (!sendRes.ok || !sendBody?.ok) throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The certificate was not sent. Try again.'))
+      endSendIntent(key, intent)
+      sent = true
       hapticSuccess()
-      toastSuccess(`Certificate sent to ${recipient}`, result.filename)
+      toastSuccess(`Certificate sent to ${recipient}`, file.filename)
     } catch (e) {
       hapticError()
-      toastError("Couldn't send certificate", (e as { message?: string })?.message || 'Unknown error')
+      toastError("Couldn't send certificate", plainError(e, 'The certificate was not sent. Try again.'))
     } finally {
+      end(sent)
       setBusy(false)
     }
   }
@@ -262,12 +299,13 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
         error={error && signoffMethod === 'signature_typed' && !signoffName.trim() ? error : undefined}
         onChange={(e) => { setSignoffName(e.target.value); setError(undefined) }}
       />
-      <Field label="Closing note" multiline rows={3} value={notes} placeholder="Punch list done, keys handed over" onChange={(e) => setNotes(e.target.value)} />
+      {closing.restored && <DraftRestored onDiscard={closing.discard} />}
+      <Field label="Closing note" multiline rows={3} value={notes} placeholder="Punch list done, keys handed over" onChange={(e) => closing.set('notes', e.target.value)} />
       {onFile && (
         <>
           <div className="fhja-pair">
-            <Button variant="secondary" disabled={busy} onClick={() => { void downloadCertificate() }}>Download certificate</Button>
-            <Button variant="secondary" disabled={busy} onClick={() => { void sendCertificate() }}>Send certificate</Button>
+            <Button variant="secondary" disabled={busy || certificateOut} onClick={() => { void downloadCertificate() }}>Download certificate</Button>
+            <Button variant="secondary" disabled={busy} loading={certificateOut} onClick={() => { void sendCertificate() }}>Send certificate</Button>
           </div>
           <div className="fhja-danger">
             <Button variant="destructive" block disabled={busy} onClick={reopen}>

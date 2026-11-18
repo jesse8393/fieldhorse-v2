@@ -80,6 +80,20 @@ test('Sunday remains visible and mobile can schedule an unscheduled job', async 
   await expect(page.getByLabel('Link to', { exact: true })).toHaveValue('Plumbing Bellevue')
 })
 
+// A company with no jobs was told "Every active job has a date." On a
+// phone the section now says there are no jobs yet and links New job, as
+// the desktop rail does. The old line stays for when every job is booked.
+test('phone unscheduled jobs on a company with no jobs offers New job', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_contacts: [], fh_schedule: [] } })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/schedule')
+  const tray = page.getByRole('region', { name: 'Unscheduled jobs' })
+  await expect(tray.getByText('No jobs yet.', { exact: true })).toBeVisible()
+  await expect(tray).not.toContainText('Every active job has a date.')
+  await tray.getByRole('link', { name: 'New job', exact: true }).click()
+  await expect(page).toHaveURL(/\/jobs\/new$/)
+})
+
 test('duration and displayed recurrence match submitted visits', async ({ context, page }) => {
   await signIn(context)
   let submitted: { start_at: string; end_at: string; recurring: string }[] = []

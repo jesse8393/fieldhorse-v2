@@ -13,6 +13,7 @@ import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import { extensionOf, isBlockedUpload, opensInline } from '../lib/fileTypes.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const BUCKET = 'job-files'
 const MAX_BYTES = 25 * 1024 * 1024 // 25 MB per file
@@ -128,7 +129,7 @@ export default function FilesSection({ jobId, userId }: any) {
       if (added > 0) toastSuccess(`${countNoun(added, 'File')} uploaded`, `Added ${added}`)
       await fetchRows()
     } catch (ex: any) {
-      toastError('Upload failed', ex?.message || 'Try again')
+      toastError('Upload failed', plainError(ex, 'Try again.'))
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
@@ -145,7 +146,7 @@ export default function FilesSection({ jobId, userId }: any) {
       .from(BUCKET)
       .createSignedUrl(row.storage_path, 3600, download ? { download: row.filename || true } : undefined)
     if (error || !data?.signedUrl) {
-      toastError('Could not open', error?.message || 'Try again')
+      toastError('Could not open', plainError(error, 'Try again.'))
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener')
@@ -179,7 +180,7 @@ export default function FilesSection({ jobId, userId }: any) {
       else toastSuccess('Deleted', row.filename)
       await fetchRows()
     } catch (ex: any) {
-      toastError('Delete failed', ex?.message || 'Try again')
+      toastError('Delete failed', plainError(ex, 'Try again.'))
     } finally {
       setDeleting(false)
     }
@@ -213,7 +214,7 @@ export default function FilesSection({ jobId, userId }: any) {
           }}
         >
           <Upload size={12} aria-hidden="true" />
-          {uploading ? 'Uploading…' : 'Add Files'}
+          {uploading ? 'Uploading…' : 'Add files'}
         </motion.button>
       </div>
 
@@ -243,7 +244,7 @@ export default function FilesSection({ jobId, userId }: any) {
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
         }}>
           <Paperclip size={28} aria-hidden="true" color="var(--v3-text-muted)" />
-          <div>No files yet. Permits, contracts, plans, upload anything that supports the job.</div>
+          <div>No files yet. Upload permits, contracts, plans or anything else that supports the job.</div>
         </div>
       )}
 

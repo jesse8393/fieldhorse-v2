@@ -1,6 +1,6 @@
 // mobile/app/invoices/[id].tsx, per-job billing detail (the web
 // InvoiceDetail). :id is a contact id. Contract / paid / balance with a
-// payment history and a Collect Payment flow. PDF/email/public-link defer.
+// payment history and a Collect payment flow. PDF/email/public-link defer.
 import { useState } from 'react'
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, Modal } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
@@ -99,7 +99,7 @@ export default function InvoiceDetailScreen() {
     try {
       const { url } = await mintPublicLink({ contactId: contact.id, userId: user.id, kind: 'invoice' })
       await Clipboard.setStringAsync(url)
-      Alert.alert('Share link copied', 'Paste it into a text or email, the customer can view and pay online.')
+      Alert.alert('Share link copied', 'Paste it into a text or email. The customer can view and pay online.')
     } catch (e: any) { Alert.alert("Couldn't create link", e?.message || 'Try again.') }
     finally { setBusy(null) }
   }
@@ -170,7 +170,7 @@ export default function InvoiceDetailScreen() {
         </View>
         {draws.length === 0 ? (
           <Text style={{ color: theme.inkMuted, fontSize: 14, marginBottom: 18 }}>
-            No draws yet. Generate a 50/40/10 schedule from the contract, or bill it all at once with Collect Payment.
+            No draws yet. Generate a 50/40/10 schedule from the contract, or bill it all at once with Collect payment.
           </Text>
         ) : (
           <View style={{ gap: 8, marginBottom: 8 }}>
@@ -234,7 +234,7 @@ export default function InvoiceDetailScreen() {
           <Pressable onPress={() => setPayOpen(true)} style={{ flex: 1.4, borderRadius: 10, overflow: 'hidden' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, backgroundColor: theme.goldBright }}>
               <DollarSign color={theme.onGold} size={15} />
-              <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Collect Payment</Text>
+              <Text style={{ color: theme.onGold, fontWeight: '800', fontSize: 14 }}>Collect payment</Text>
             </View>
           </Pressable>
         </View>

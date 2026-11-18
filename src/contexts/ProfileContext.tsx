@@ -5,6 +5,7 @@ import { legacyLogoPath, migrateLegacyLogo } from '../lib/logoMigration.ts'
 import { readSavedIdentity, saveIdentity } from '../lib/identityCache.ts'
 import { useAuth } from './AuthContext.tsx'
 import type { Database } from '../lib/database.types.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 
@@ -80,7 +81,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     if (fetchError) {
       console.warn('[fieldhorse] profile fetch error', fetchError)
       lastFetchFailedRef.current = true
-      setError(fetchError.message || 'Could not load profile')
+      setError(plainError(fetchError, 'Could not load profile.'))
       setLoading(false)
       return
     }

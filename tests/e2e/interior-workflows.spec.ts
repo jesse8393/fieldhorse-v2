@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { expectPlain, FAIL } from './helpers/rawErrors.ts'
 
 const NOW = '2026-11-02T14:00:00.000Z'
 const quotes = ['draft', 'sent', 'approved', 'changes_requested', 'sent'].map((status, i) => ({
@@ -72,6 +73,64 @@ test('setup steps reflect entered details and support keyboard navigation', asyn
   await expect(steps.getByRole('link', { name: 'Services Added' })).toBeVisible()
   await expect(steps.getByRole('link', { name: 'Location Optional' })).toBeVisible()
   await expect(page.getByLabel('Company name', { exact: true })).toHaveValue('Oak & Stone')
+})
+
+// raw-errors-12: a new company's first screen said "TypeError: Failed to
+// fetch" when making the workspace failed on a weak signal.
+test('making the workspace on a weak signal says so in plain words', async ({ context, page }) => {
+  await signIn(context, { tables: {
+    profiles: [{ user_id: 'qa-user-1', full_name: null, company_name: null, onboarded_at: null, logo_url: null, location_lat: null, location_lon: null, services: [], preferences: {} }],
+    org_members: [], organizations: []
+  } })
+  let answer: 'check' | 'drop' = 'check'
+  await context.route((url) => url.pathname === '/rest/v1/rpc/create_own_org', (route) => answer === 'drop'
+    ? route.abort('failed')
+    : route.fulfill({ status: FAIL.check('organizations', 'organizations_name_check').status, contentType: 'application/json', body: FAIL.check('organizations', 'organizations_name_check').body }))
+  await page.goto('/onboarding')
+  await page.getByLabel('Company name', { exact: true }).fill('Fresh Concrete Co')
+  await page.getByRole('group', { name: 'Trade services' }).getByRole('button').first().click()
+  await page.getByRole('button', { name: 'Start with sample data' }).click()
+  // No control is named Start, so the sentence names none (raw-errors-12).
+  await expectPlain(page.getByRole('alert'), 'Your workspace was not made yet. Try again.')
+  answer = 'drop'
+  await page.getByRole('button', { name: 'Start with sample data' }).click()
+  await expectPlain(page.getByRole('alert'), 'Your workspace was not made yet. No signal right now. Your work is still here, so try again when the signal is back.')
+  await expect(page.getByLabel('Company name', { exact: true })).toHaveValue('Fresh Concrete Co')
+})
+
+// A new sign up on a weak signal: while the profile and membership reads
+// are out, onboarding paints the same dark loading stage the sign in
+// screens use, not a blank white page.
+test('onboarding shows the loading stage while its reads are slow', async ({ context, page }) => {
+  await signIn(context, { tables: { profiles: [], org_members: [], organizations: [] } })
+  let release = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await context.route('**/rest/v1/profiles**', async (route) => { await held; return route.fallback() })
+  await page.goto('/onboarding', { waitUntil: 'domcontentloaded' })
+  const stage = page.locator('main.fha[aria-busy="true"]')
+  await expect(stage).toBeVisible()
+  const background = await page.evaluate(() => getComputedStyle(document.querySelector('main.fha') as Element).backgroundColor)
+  expect(background).not.toBe('rgba(0, 0, 0, 0)')
+  expect(background).not.toBe('rgb(255, 255, 255)')
+  release()
+  await expect(page.getByLabel('Company name', { exact: true })).toBeVisible()
+  await expect(stage).toHaveCount(0)
+})
+
+// The only way to start without sample data was 12 px underlined text in
+// a 26 px tall target. It is a real secondary button now: at least 44 px
+// tall with 16 px text, and still not the primary.
+test('onboarding Skip and start empty is a full size secondary button', async ({ context, page }) => {
+  await signIn(context, { tables: { profiles: [{ user_id: 'qa-user-1', company_name: '', onboarded_at: null, services: [] }] } })
+  await page.goto('/onboarding')
+  const skip = page.getByRole('button', { name: 'Skip and start empty', exact: true })
+  await expect(skip).toBeVisible()
+  const box = await skip.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+  const size = await skip.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+  expect(size).toBeGreaterThanOrEqual(16)
+  await expect(skip).not.toHaveClass(/primary/)
+  await expect(page.getByRole('button', { name: 'Start with sample data', exact: true })).toHaveClass(/primary/)
 })
 
 test('field roles receive guides without owner checklist queries', async ({ context, page }) => {

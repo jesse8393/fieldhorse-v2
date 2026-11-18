@@ -144,7 +144,7 @@ export default class RouteErrorBoundary extends React.Component<{ children?: Rea
                 boxShadow: '0 0 0 3px rgba(201, 150, 58, 0.16), 0 4px 12px rgba(201, 150, 58, 0.30), 0 1px 0 var(--v3-border-strong) inset'
               }}
             >
-              Go Home
+              Go home
             </button>
             <button
               type="button"

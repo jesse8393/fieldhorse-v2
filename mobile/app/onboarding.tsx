@@ -97,7 +97,7 @@ export default function OnboardingScreen() {
         />
 
         <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-1">Trades</Text>
-        <Text className="text-ink-muted text-xs mb-3">Pick every trade you run, this configures your rate card and pour condition rules.</Text>
+        <Text className="text-ink-muted text-xs mb-3">Pick every trade you run. This sets up your rate card and pour condition rules.</Text>
         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
           {TRADES.map((t) => {
             const on = services.includes(t.key)
@@ -117,7 +117,7 @@ export default function OnboardingScreen() {
         <Text className="text-ink-muted text-xs mt-3">{services.length} trade{services.length === 1 ? '' : 's'} picked</Text>
 
         <Text className="text-ink-muted text-xs font-bold tracking-[0px] uppercase mb-1 mt-7">Location</Text>
-        <Text className="text-ink-muted text-xs mb-3">Optional, powers local weather and pour window forecasts.</Text>
+        <Text className="text-ink-muted text-xs mb-3">Optional. Powers local weather and pour window forecasts.</Text>
         <Pressable
           onPress={requestLocation}
           disabled={locStatus === 'requesting'}
@@ -126,7 +126,7 @@ export default function OnboardingScreen() {
         >
           <MapPin color={locStatus === 'ok' ? '#2D7A4F' : '#C9963A'} size={16} />
           <Text className="text-ink text-sm flex-1">
-            {locStatus === 'ok' ? 'Location captured' : locStatus === 'requesting' ? 'Getting location…' : locStatus === 'error' ? 'Location unavailable, tap to retry' : 'Use my current location'}
+            {locStatus === 'ok' ? 'Location captured' : locStatus === 'requesting' ? 'Getting location…' : locStatus === 'error' ? 'Location unavailable. Tap to try again' : 'Use my current location'}
           </Text>
           {locStatus === 'requesting' ? <ActivityIndicator size="small" color="#C9963A" /> : null}
         </Pressable>

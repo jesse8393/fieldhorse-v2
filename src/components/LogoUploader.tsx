@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { supabase } from '../lib/supabase.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml'
 const MAX_BYTES = 2 * 1024 * 1024 // 2 MB
@@ -47,7 +48,7 @@ export default function LogoUploader({ logoUrl, companyName, onUpload, size = 'm
       const url = `${data.publicUrl}?v=${Date.now()}`
       await onUpload?.(url)
     } catch (ex: any) {
-      setErr(ex.message || 'Upload failed')
+      setErr(plainError(ex, 'The logo did not upload. Try again.'))
     } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''

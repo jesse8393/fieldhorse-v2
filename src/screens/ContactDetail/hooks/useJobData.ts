@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { contractTotals } from '../../../lib/invoices.ts'
 import type { Database } from '../../../lib/database.types.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 type Contact = Database['public']['Tables']['fh_contacts']['Row']
 type ContactUpdate = Database['public']['Tables']['fh_contacts']['Update']
@@ -169,7 +170,7 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
       .select('id')
     const failure = error
       || (!rows || rows.length === 0
-        ? { message: 'This job may have been removed, or you no longer have access to edit it.' }
+        ? new Error('This job may have been removed, or you no longer have access to edit it.')
         : null)
     if (!failure) {
       toastSuccess('Saved', 'Changes synced')
@@ -185,7 +186,7 @@ export function useJobData(id: string | undefined, userId: string | undefined) {
       )
     }
     queryClient.invalidateQueries({ queryKey: key })
-    toastError("Couldn't save", failure.message || 'Try again')
+    toastError("Couldn't save", plainError(failure, 'Try again.'))
     return { error: failure }
   }, [id, queryClient])
 

@@ -163,11 +163,14 @@ describe('railNotes', () => {
 })
 
 describe('documentRows', () => {
-  const quoted = { stage: 'job', amount: 12375, proposal_status: 'approved' }
+  const quoted = { id: '1c8d2e3f-4051-4b6c-9d7e-8f9a0b1c2d3e', stage: 'job', amount: 12375, proposal_status: 'approved' }
 
+  // formats-1: an invoice is named by the number its PDF and customer link
+  // print (PCC-2D3E-01), the way the job's Invoices tab names it.
   it('lists the quote, invoices and files for money roles', () => {
     const rows = documentRows({
       contact: quoted,
+      companyName: 'Parker Construction Company',
       invoices: [
         { id: 'i2', sequence_number: 2, title: 'Final draw', status: 'sent', due_at: '2026-10-20' },
         { id: 'i1', sequence_number: 1, title: 'Deposit', status: 'paid', due_at: '2026-09-30' }
@@ -181,11 +184,14 @@ describe('documentRows', () => {
     })
     expect(rows.map((r) => [r.label, r.detail, r.tab])).toEqual([
       ['Quote', 'Approved', 'quote'],
-      ['Invoice 1, Deposit', 'Paid', 'financials'],
-      ['Invoice 2, Final draw', 'Sent, due Oct 20', 'financials'],
+      ['PCC-2D3E-01, Deposit', 'Paid', 'financials'],
+      ['PCC-2D3E-02, Final draw', 'Sent, due Oct 20', 'financials'],
       ['Permit RC 26 0931.pdf', 'Oct 9', 'files'],
       ['Site plan.pdf', 'Sep 20', 'files']
     ])
+    // dead-ends-10: an invoice opens its own screen; the quote and the
+    // files keep switching to their section.
+    expect(rows.map((r) => r.to ?? null)).toEqual([null, '/invoices/i1', '/invoices/i2', null, null])
   })
 
   it('leaves the quote and invoices to money roles', () => {
@@ -222,8 +228,10 @@ describe('documentRows', () => {
       canSeeMoney: true,
       now: NOW
     })
+    // The printed invoice number (INV-2D3E-01) is an id, and its hyphens
+    // are part of it; the words around it carry no dashes.
     for (const row of rows) {
-      expect(row.label).not.toMatch(DASHES)
+      expect(row.label.replace(/\b[A-Z]{2,7}(-[A-Z0-9]{1,4})+\b/g, '')).not.toMatch(DASHES)
       expect(row.detail ?? '').not.toMatch(DASHES)
     }
   })

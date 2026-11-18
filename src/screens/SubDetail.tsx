@@ -10,7 +10,7 @@ import {
 import { supabase } from '../lib/supabase.ts'
 import { useSubDetail, subDetailKey } from '../lib/queries.ts'
 import { formatPhone } from '../lib/utils.ts'
-import { countNoun } from '../lib/format.ts'
+import { countNoun, moneyCents } from '../lib/format.ts'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import { hapticTap, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
@@ -20,11 +20,13 @@ import { toastSuccess, toastError } from '../lib/toast.ts'
 import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
+import { isEnterToSave, useKeyboardInset } from '../lib/useKeyboardOpen.ts'
 import { useMembership } from '../contexts/MembershipContext.tsx'
 import { EmptyState } from '../ui/index.ts'
 import { parseDateOnly } from '../lib/dates.ts'
 import { useArmedId } from '../lib/secondTap.ts'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // SubDetail, vendor profile surface at /subs/:key.
 //
@@ -116,7 +118,7 @@ export default function SubDetail() {
   const subRows = useMemo(() => bundle?.subRows ?? [], [bundle?.subRows])
   const contacts = bundle?.contacts ?? {}
   const profile = bundle?.profile ?? null
-  const error = isError ? (queryError?.message || 'Could not load sub') : ''
+  const error = isError ? plainError(queryError, 'Could not load this sub. Check your connection and try again.') : ''
   const [creating, setCreating] = useState(false)
 
   // Profile create / edit writes straight to the cached bundle so the
@@ -165,7 +167,7 @@ export default function SubDetail() {
       .maybeSingle()
     setCreating(false)
     if (insErr) {
-      toastError("Couldn't create profile", insErr.message)
+      toastError("Couldn't create profile", plainError(insErr, 'Try again.'))
       return
     }
     hapticSuccess()
@@ -212,7 +214,7 @@ export default function SubDetail() {
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
             {error}
           </div>
-          <div style={{ fontSize: 12 }}>Try again, or check the Sub Directory.</div>
+          <div style={{ fontSize: 12 }}>Try again, or go back to Subs.</div>
         </div>
       </div>
     )
@@ -329,25 +331,26 @@ export default function SubDetail() {
             </div>
           )}
 
-          {/* KPI strip */}
+          {/* KPI strip. Billed carries cents, so when it does not fit
+              beside Trades, Trades moves to the next line instead of
+              being drawn over. */}
           <div style={{
             marginTop: 14,
-            display: 'grid',
-            gridTemplateColumns: '1fr 1px 1fr',
-            alignItems: 'end',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'flex-end',
             gap: 12
           }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: '1 1 auto' }}>
               <Eyebrow tone="gold">Billed</Eyebrow>
               <StampNumber size="2xl" tone="gold" style={{ display: 'block', lineHeight: 0.95 }}>
-                ${totals.billed.toLocaleString()}
+                {moneyCents(totals.billed)}
               </StampNumber>
               <Eyebrow as="div" style={{ marginTop: 2 }}>
                 Across {subRows.length} {subRows.length === 1 ? 'job' : 'jobs'}
               </Eyebrow>
             </div>
-            <span aria-hidden="true" style={{ background: 'var(--v3-border)', alignSelf: 'stretch' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, flex: '1 1 auto', paddingLeft: 12, borderLeft: '1px solid var(--v3-border)' }}>
               <Eyebrow>Trades</Eyebrow>
               <StampNumber size="xl" style={{ display: 'block', lineHeight: 0.95 }}>
                 {totals.trades.length || '\u2003'}
@@ -468,7 +471,7 @@ export default function SubDetail() {
                     color: 'var(--v3-text)',
                     fontVariantNumeric: 'tabular-nums'
                   }}>
-                    {Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}
+                    {Number(r.rate || 0) > 0 ? moneyCents(r.rate) : '\u2003'}
                   </span>
                 </li>
               )
@@ -602,7 +605,7 @@ function SubDetailDesktop({
           </div>
 
           <div className="fh-build-mini-grid">
-            <MiniMetric label="Billed" value={`$${totals.billed.toLocaleString()}`} accent />
+            <MiniMetric label="Billed" value={moneyCents(totals.billed)} accent />
             <MiniMetric label="Job history" value={String(subRows.length)} />
             <MiniMetric label="Trades" value={String(totals.trades.length || 0)} />
             <MiniMetric label="Insurance" value={insuranceLabel} tone={insuranceTone} />
@@ -671,7 +674,7 @@ function SubDetailDesktop({
                         <strong className="fh-build-truncate" title={c?.name || ''}>{c?.name || 'Job not found'}</strong>
                         <span className="fh-build-rel">{r.trade || '\u2003'}</span>
                         <span className="fh-build-rel">{r.created_at ? fmtRelativeDate(new Date(r.created_at)) : '\u2003'}</span>
-                        <span className="fh-build-num">{Number(r.rate || 0) > 0 ? `$${Number(r.rate).toLocaleString()}` : '\u2003'}</span>
+                        <span className="fh-build-num">{Number(r.rate || 0) > 0 ? moneyCents(r.rate) : '\u2003'}</span>
                         <ChevronRight size={13} aria-hidden="true" />
                       </Link>
                     )
@@ -699,7 +702,7 @@ function SubDetailDesktop({
 
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Trades</div>
-              <strong>{totals.trades.length || '-'}</strong>
+              <strong>{totals.trades.length}</strong>
               <span>{totals.trades.length ? totals.trades.join(', ') : 'No trade tags yet'}</span>
             </section>
 
@@ -712,9 +715,7 @@ function SubDetailDesktop({
             <section className="fh-build-rail-card">
               <div className="fh-build-eyebrow">Documents</div>
               <strong>
-                {profile
-                  ? [profile.w9_path, profile.coi_path, profile.license_path].filter(Boolean).length
-                  : '-'} / 3
+                {[profile?.w9_path, profile?.coi_path, profile?.license_path].filter(Boolean).length} of 3
               </strong>
               <span>W9, COI, and license tracked in the editor.</span>
             </section>
@@ -806,6 +807,9 @@ function ProfileEditor({ profile, onSaved }: any) {
   }))
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  // With a phone keyboard up, Save rides above it instead of staying at
+  // the dock's height under it.
+  const keyboardInset = useKeyboardInset()
 
   const setField = (k: any, v: any) => {
     setForm((prev) => ({ ...prev, [k]: v }))
@@ -851,7 +855,7 @@ function ProfileEditor({ profile, onSaved }: any) {
       .maybeSingle()
     setSaving(false)
     if (error) {
-      toastError("Couldn't save", error.message)
+      toastError("Couldn't save", plainError(error, 'Try again.'))
       return
     }
     hapticSuccess()
@@ -862,6 +866,15 @@ function ProfileEditor({ profile, onSaved }: any) {
 
   return (
     <>
+      {/* Enter in one of these fields saves, so the keyboard can stay up. */}
+      <div
+        style={{ display: 'contents' }}
+        onKeyDown={(event) => {
+          if (!isEnterToSave(event) || !dirty || saving || !form.name.trim()) return
+          event.preventDefault()
+          void save()
+        }}
+      >
       {/* CONTACT */}
       <Section icon={<Hammer size={11} />} label="Contact">
         <Field label="Name" value={form.name} onChange={(v: any) => setField('name', v)} required />
@@ -913,9 +926,10 @@ function ProfileEditor({ profile, onSaved }: any) {
           />
         </Row>
         <Eyebrow as="div" style={{ marginTop: 4, color: 'var(--v3-text-muted)' }}>
-          Lightweight only, never store full account or routing numbers here.
+          Keep it short. Never store full account or routing numbers here.
         </Eyebrow>
       </Section>
+      </div>
 
       {/* DOCUMENTS */}
       <DocumentsSection profile={profile} onChanged={onSaved} />
@@ -925,7 +939,7 @@ function ProfileEditor({ profile, onSaved }: any) {
         <textarea
           value={form.notes}
           onChange={(e) => setField('notes', e.target.value)}
-          placeholder="Anything to remember, scheduling quirks, crew sizes, preferred suppliers…"
+          placeholder="Anything to remember: scheduling quirks, crew sizes, preferred suppliers…"
           rows={4}
           style={{
             width: '100%', boxSizing: 'border-box',
@@ -941,7 +955,7 @@ function ProfileEditor({ profile, onSaved }: any) {
       {/* STICKY SAVE */}
       <div className="fh-subdetail-savebar" style={{
         position: 'sticky',
-        bottom: 'calc(var(--fh-mobile-dock-height) + 16px)',
+        bottom: keyboardInset ? keyboardInset + 16 : 'calc(var(--fh-mobile-dock-height) + 16px)',
         margin: '0 20px',
         zIndex: 5
       }}>
@@ -1036,7 +1050,7 @@ function DocumentsSection({ profile, onChanged }: any) {
       toastSuccess('Uploaded', `${DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId} on file`)
       hapticSuccess()
     } catch (e: any) {
-      toastError("Couldn't upload", e?.message || 'Try again')
+      toastError("Couldn't upload", plainError(e, 'Try again.'))
     } finally {
       setBusySlot(null)
     }
@@ -1065,7 +1079,7 @@ function DocumentsSection({ profile, onChanged }: any) {
       onChanged?.(data)
       toastSuccess('Removed', `${label} cleared`)
     } catch (e: any) {
-      toastError("Couldn't remove", e?.message || 'Try again')
+      toastError("Couldn't remove", plainError(e, 'Try again.'))
     } finally {
       setBusySlot(null)
     }
@@ -1077,7 +1091,7 @@ function DocumentsSection({ profile, onChanged }: any) {
       .from('sub-docs')
       .createSignedUrl(currentPath, 60)
     if (error || !data?.signedUrl) {
-      toastError("Couldn't open file", error?.message || 'Try again')
+      toastError("Couldn't open file", plainError(error, 'Try again.'))
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
@@ -1183,7 +1197,7 @@ function BackButton({ onClick }: any) {
       }}
     >
       <ChevronLeft size={16} aria-hidden="true" />
-      Sub Directory
+      Subs
     </button>
   )
 }

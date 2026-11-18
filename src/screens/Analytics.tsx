@@ -17,11 +17,17 @@ import { hapticTap, hapticMedium } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { useIsDesktop } from '../lib/useMediaQuery.ts'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
+import { useNavAccess } from '../lib/useNavAccess.ts'
+import { Button, EmptyState } from '../components/fh'
 const SnowAnalytics = lazy(() => import('../components/desktop/SnowAnalyticsBuild.tsx'))
 import SectionHeader from '../components/v3/SectionHeader.tsx'
 import { Eyebrow } from '../components/v3'
+import { marginPercent, moneyCents } from '../lib/format.ts'
 
-function money(n: any) { return Number(n || 0).toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) }
+// A client's payments and other single figures to the cent (formats-4).
+// The KPI tiles and the chart keep the compact form below: they are space
+// bound summaries, not one record.
+const money = moneyCents
 // Compact currency, matches Home hero pattern. Skips compaction under $1k
 // so small numbers don't render as "$900" / "$0K" weirdness.
 function fmtMoneyCompact(n: any) {
@@ -253,7 +259,7 @@ export default function Analytics() {
       totals.set(key, (totals.get(key) || 0) + Number(p.amount || 0))
     }
     return Array.from(totals.entries())
-      .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
+      .map(([name, amount]) => ({ name, amount }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 5)
   }, [payments, contacts, clients, invoices])
@@ -296,6 +302,18 @@ export default function Analytics() {
 
   const { stagger, item } = useFhMotion()
   const isDesktop = useIsDesktop()
+  const { canSee } = useNavAccess()
+
+  // A company with no jobs, leads or quotes yet gets one empty state on
+  // both layouts: what fills this page and the first step, not $0 tiles.
+  const empty = !loading && contacts.length === 0 && leadRows.length === 0 && quoteRows.length === 0
+  const emptyState = (
+    <EmptyState
+      icon={BarChart3}
+      title="Reports fill in as you add leads, quotes and jobs."
+      action={canSee('/leads/new') ? <Button variant="primary" size="md" to="/leads/new">New lead</Button> : undefined}
+    />
+  )
 
   // A failed read with nothing to show says so on both layouts, never
   // "Not enough data yet." or a book of zeros. A failed refresh keeps the
@@ -325,6 +343,7 @@ export default function Analytics() {
         byStage={byStage}
         revenueByMonth={revenueByMonth}
         topClients={topClients}
+        empty={empty ? emptyState : undefined}
       /></Suspense>
     )
   }
@@ -375,17 +394,9 @@ export default function Analytics() {
         </motion.div>
       )}
 
-      {!loading && contacts.length === 0 && leadRows.length === 0 && quoteRows.length === 0 && (
-        <motion.div variants={item} className="v3-section" style={{ margin: '0 var(--v3-gutter) 14px' }}>
-          <div className="v3-empty">
-            <BarChart3 size={22} color="var(--v3-text-muted)" style={{ margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--v3-text)', marginBottom: 4 }}>
-              Not enough data yet.
-            </div>
-            <div style={{ fontSize: 14, lineHeight: 1.5 }}>
-              Add a few leads and start closing. Analytics lights up once the pipeline moves.
-            </div>
-          </div>
+      {empty && (
+        <motion.div variants={item} style={{ margin: '0 var(--v3-gutter) 14px' }}>
+          {emptyState}
         </motion.div>
       )}
 
@@ -405,7 +416,7 @@ export default function Analytics() {
               <KPI label="Active job value" to={stats.pipeline} format={fmtMoneyCompact} />
               <KPI label="Won YTD" to={stats.wonYTD} format={fmtMoneyCompact} />
               <KPI label="Tracked profit YTD" to={stats.profitYTD} format={fmtMoneyCompact} Icon={DollarSign} note={stats.profitNote} gold />
-              <KPI label="Avg margin"        to={stats.avgMargin}        format={fmtPct}          Icon={Target} note={stats.avgMarginNote} />
+              <KPI label="Avg margin"        to={stats.avgMargin}        format={marginPercent}   Icon={Target} note={stats.avgMarginNote} />
               <KPI label="Win rate · 90 days"        to={stats.closeRate}        format={fmtPct}          Icon={Target} note={stats.closeRateNote} />
               <KPI label="Active leads"      to={stats.leads}            format={fmtInt}          Icon={TrendingUp} />
               <KPI label="Miles YTD"         to={stats.milesYTD}         format={fmtInt}          Icon={Car} />

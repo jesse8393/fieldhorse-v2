@@ -19,7 +19,7 @@ import { createClient } from '@supabase/supabase-js'
 import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
-import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
+import { formatFromHeader, renderParagraphs, textField, documentSendKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
 
 export default async (request) => {
@@ -38,7 +38,7 @@ export default async (request) => {
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({
       error: 'server_misconfigured',
-      message: 'Server is missing Supabase credentials.'
+      message: 'Email sending is not available right now. Try again later.'
     }, 500)
   }
   if (!RESEND_API_KEY || !SEND_EMAIL_FROM) {
@@ -54,7 +54,7 @@ export default async (request) => {
   const authHeader = request.headers.get('authorization') || ''
   const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
   if (!accessToken) {
-    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+    return json({ error: 'missing_token', detail: 'Sign in again, then try again.' }, 401)
   }
 
   let body
@@ -165,7 +165,7 @@ export default async (request) => {
   const fromName = companyName || SEND_EMAIL_FROM_NAME
   const fromHeader = formatFromHeader(fromName, SEND_EMAIL_FROM)
   const jobLabel = contact.job_title || contact.name || 'your project'
-  const subject = `Certificate of Completion for ${jobLabel}`
+  const subject = `Certificate of completion for ${jobLabel}`
   // Optional fields read through textField so a non string value from a
   // malformed client falls back to the default instead of throwing.
   const safeRecipientName = textField(recipient_name) || textField(contact.name)
@@ -176,7 +176,7 @@ export default async (request) => {
   const text = [
     greeting,
     '',
-    customMessage || `Attached is the Certificate of Completion for ${jobLabel}. Keep this with your records. It covers the warranty terms and the completion date.`,
+    customMessage || `Attached is the certificate of completion for ${jobLabel}. Keep this with your records. It covers the warranty terms and the completion date.`,
     '',
     'Reply directly to this email if you have any questions or spot anything that needs follow up.',
     '',
@@ -209,7 +209,7 @@ export default async (request) => {
   const sent = await sendViaResend({
     apiKey: RESEND_API_KEY,
     payload: resendPayload,
-    key: idempotencyKey('send-certificate', `job:${contact_id}`, storage_path, normalizedEmail)
+    key: documentSendKey('send-certificate', `job:${contact_id}`, body || {}, normalizedEmail)
   })
   if (!sent.ok) {
     return json(sendFailure(sent), 502)
@@ -233,7 +233,7 @@ export default async (request) => {
     await supabase.from('fh_notes').insert({
       user_id: sender_user_id,
       contact_id,
-      text: `Certificate of Completion sent to ${normalizedEmail}`,
+      text: `Certificate of completion sent to ${normalizedEmail}`,
       category: 'activity'
     })
   } catch (e) {
@@ -254,7 +254,7 @@ function renderCertificateHtml({ greeting, customMessage, jobLabel, senderLine, 
   // The operator's note keeps its paragraphs and line breaks.
   const msg = customMessage
     ? renderParagraphs(customMessage, safe)
-    : `<p style="margin:0;">Attached is the Certificate of Completion for <strong>${safe(jobLabel)}</strong>. Keep this with your records. It covers the warranty terms and the completion date.</p>`
+    : `<p style="margin:0;">Attached is the certificate of completion for <strong>${safe(jobLabel)}</strong>. Keep this with your records. It covers the warranty terms and the completion date.</p>`
   return `<!doctype html>
 <html lang="en">
 ${EMAIL_HEAD}

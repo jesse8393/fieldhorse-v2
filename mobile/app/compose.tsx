@@ -18,6 +18,7 @@ import { claudeMessage, claudeText } from '../lib/anthropic'
 import { useJobs, useProfile, type JobRow } from '../lib/queries'
 import { useAuth } from '../contexts/AuthContext'
 import { sendMessageEmail } from '../lib/sendDocs'
+import { plainPunctuation } from '../lib/composeDraft'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -64,13 +65,13 @@ export default function ComposeScreen() {
         : 'Recipient: generic contact (not yet linked to a job).'
       const company = profile?.company_name || 'the contractor'
       const res = await claudeMessage({
-        system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${company}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Sign off as ${company}; never mention any platform, app, or tool by name.`,
+        system: `You are a messaging assistant for a contractor's business. Write a ${ch?.label} message on behalf of ${company}. ${ch?.tone} Brand voice: jobsite-direct, no buzzwords, no "captain" or naval metaphors ever, no "circle back". Plain punctuation: no em dashes, no en dashes, no hyphens used as dashes, and no exclamation marks. Sign off as ${company}; never mention any platform, app, or tool by name.`,
         messages: [{ role: 'user', content: `Intent: ${intent}\n${contactLine}\nExtra context: ${context || 'none'}\n\nReturn only the message text, no preamble.` }],
         maxTokens: 500
       })
       const text = claudeText(res)
       if (!text) throw new Error('Empty response from the assistant.')
-      setDraft(text)
+      setDraft(plainPunctuation(text))
     } catch (e: any) {
       const msg = String(e?.message || '').toLowerCase()
       if (msg.includes('500') || msg.includes('api_key')) setError('AI not configured on the server (ANTHROPIC_API_KEY).')
@@ -159,7 +160,7 @@ export default function ComposeScreen() {
           value={context}
           onChangeText={setContext}
           multiline
-          placeholder="Anything specific to mention, dates, amounts, tone…"
+          placeholder="Anything specific to mention: dates, amounts, tone…"
           placeholderTextColor="rgba(242,237,228,0.4)"
           style={[input, { minHeight: 80, textAlignVertical: 'top' }]}
         />

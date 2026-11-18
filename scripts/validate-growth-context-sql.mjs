@@ -36,6 +36,8 @@ try {
     create table public.fh_agent_runs(id uuid primary key default gen_random_uuid(),org_id uuid,agent_id uuid,client_id uuid,contact_id uuid,conversation_id uuid,trigger_kind text,mode text,input jsonb,status text,proposal jsonb,run_id uuid,approved_by uuid,approved_at timestamptz,executed_message_id uuid,updated_at timestamptz);
     create table public.fh_messages(id uuid primary key default gen_random_uuid(),org_id uuid,conversation_id uuid,client_id uuid,contact_id uuid,channel text,direction text,status text,hold_reason text,purpose text,subject text,body text,body_html text,from_address text,to_address text,media jsonb,sent_by_user uuid,sent_by_kind text,workflow_run_id uuid,agent_run_id uuid,campaign_id uuid,phone_number_id uuid,error text);
     create table public.fh_outbox(id uuid primary key default gen_random_uuid(),org_id uuid,kind text,payload jsonb,status text,hold_reason text,next_attempt_at timestamptz,run_id uuid,message_id uuid,client_id uuid,campaign_id uuid,agent_run_id uuid,phone_number_id uuid);
+    create table public.fh_quotes(id uuid primary key,org_id uuid,client_id uuid,job_id uuid);
+    create table public.fh_public_links(id uuid primary key default gen_random_uuid(),org_id uuid,user_id uuid,contact_id uuid,quote_id uuid,kind text,token text,expires_at timestamptz,revoked_at timestamptz,created_at timestamptz default now());
     create function public.fh_is_org_member(p_org_id uuid) returns boolean language sql stable security definer set search_path=pg_catalog,public as $$ select exists(select 1 from public.org_members where org_id=p_org_id and user_id=auth.uid() and revoked_at is null) $$;
     create function public.fh_money_visible(p_org_id uuid) returns boolean language sql stable security definer set search_path=pg_catalog,public as $$ select not exists(select 1 from public.org_members where org_id=p_org_id and user_id=auth.uid() and revoked_at is null and role in ('crew','foreman')) $$;
     create function public.fh_org_ctx(uuid) returns jsonb language sql as $$ select '{"name":"Synthetic company"}'::jsonb $$;
@@ -117,6 +119,47 @@ try {
     await db.query('select public.fh_agent_run_approve($1)',[id(702)]); await assert.rejects(db.query('select public.fh_agent_run_approve($1)',[id(702)]))
     assert.equal((await db.query('select stage from public.fh_contacts where id=$1',[id(300)])).rows[0].stage,'closed')
   })
+  // dead-ends-11: the quote link the agent and message templates read is the
+  // customer's own proposal link, /p/:token, or nothing. It used to point at
+  // /q/:job, a route the app does not have.
+  await db.exec('reset role')
+  await db.exec(await source('supabase/migrations/20261118093712_client_ctx_quote_link.sql'))
+  await as()
+  const quoteLink = async () => (await ctx(100,300)).rows[0].ctx.job.quote_link
+  await test('a job with no open customer link hands the agent no quote link',async()=>{
+    assert.equal(await quoteLink(),null)
+  })
+  await db.exec('reset role')
+  await db.query("insert into public.fh_public_links(org_id,contact_id,kind,token,revoked_at,created_at) values($1,$2,'proposal','tok-revoked','2026-10-02','2026-10-01')",[id(10),id(300)])
+  await db.query("insert into public.fh_public_links(org_id,contact_id,kind,token,expires_at,created_at) values($1,$2,'proposal','tok-expired','2026-10-03','2026-10-02')",[id(10),id(300)])
+  await db.query("insert into public.fh_public_links(org_id,contact_id,kind,token,created_at) values($1,$2,'invoice','tok-invoice','2026-10-04')",[id(10),id(300)])
+  await as()
+  await test('revoked, expired and invoice links are never handed out as the quote',async()=>{
+    assert.equal(await quoteLink(),null)
+  })
+  await db.exec('reset role')
+  await db.query("insert into public.fh_public_links(org_id,contact_id,kind,token,created_at) values(null,$1,'proposal','tok-job','2026-10-05')",[id(300)])
+  await as()
+  await test('the job\'s open proposal link is the customer link on the default domain',async()=>{
+    assert.equal(await quoteLink(),'https://fieldhorse.app/p/tok-job')
+  })
+  await db.exec('reset role')
+  await db.query("insert into public.fh_org_settings(org_id,app_base_url) values($1,'https://app.example.invalid')",[id(10)])
+  await db.query('insert into public.fh_quotes values($1,$2,$3,$4)',[id(800),id(10),id(100),id(300)])
+  await db.query("insert into public.fh_public_links(org_id,quote_id,kind,token,created_at) values($1,$2,'proposal','tok-quote','2026-10-06')",[id(10),id(800)])
+  await db.query('insert into public.fh_quotes values($1,$2,$3,$4)',[id(801),id(20),id(200),id(300)])
+  await db.query("insert into public.fh_public_links(org_id,quote_id,kind,token,created_at) values($1,$2,'proposal','tok-foreign','2026-10-07')",[id(20),id(801)])
+  await as()
+  await test('the newest open link on the job or on the quote that became it, on the company domain',async()=>{
+    assert.equal(await quoteLink(),'https://app.example.invalid/p/tok-quote')
+  })
+  await test('the context never names the /q/ route',async()=>{
+    assert(!JSON.stringify((await ctx(100,300)).rows[0].ctx).includes('/q/'))
+  })
+  await test('the quote link file names no statement that removes things',async()=>{
+    assert(!/\b(drop|delete|truncate)\b/i.test(await source('supabase/migrations/20261118093712_client_ctx_quote_link.sql')))
+  })
+
   await as(null,'service_role')
   await test('service role retains valid context but cannot mix customers',async()=>{
     assert.equal((await ctx(100,300)).rows[0].ctx.job.id,id(300)); await denied('select public.fh_client_ctx($1,$2)',[id(100),id(400)])

@@ -6,9 +6,11 @@ import { recalcCost } from '../../../lib/stages.ts'
 import { toastError, toastSuccess, toastUndo } from '../../../lib/toast.ts'
 import { hapticTap } from '../../../lib/haptics.ts'
 import { formatPhone } from '../../../lib/utils.ts'
+import { moneyCents } from '../../../lib/format.ts'
 import { Button, Field } from '../../../components/fh'
 import { Choices } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const SUB_STATUSES = [
   { value: 'scheduled', label: 'Scheduled' },
@@ -22,12 +24,6 @@ const STATUS_COLOR: Record<string, string> = {
   onsite:    'var(--v3-success-text)',
   complete:  'var(--v3-primary-text)',
   paid:      'var(--v3-success-text)'
-}
-
-function money(n: any) {
-  return Number(n || 0).toLocaleString(undefined, {
-    style: 'currency', currency: 'USD', maximumFractionDigits: 0
-  })
 }
 
 /**
@@ -62,7 +58,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
       status: form.status
     })
     if (error) {
-      toastError("Couldn't add sub", error.message)
+      toastError("Couldn't add sub", plainError(error, 'Try again.'))
       setSaving(false)
       return
     }
@@ -78,7 +74,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
     // Match by id only: a teammate must be able to remove a sub someone else
     // added. RLS scopes the company; an empty result means nothing was removed.
     const { data: removed, error } = await supabase.from('fh_subs').delete().eq('id', id).select('id')
-    if (error) { toastError("Couldn't delete", error.message); return }
+    if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); return }
     if (!removed || removed.length === 0) {
       toastError("Couldn't delete", 'This sub may already be gone, or your role cannot remove it.')
       fetchAll?.()
@@ -91,7 +87,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_subs').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         await recalcCost(contact.id, userId)
         fetchAll?.()
         toastSuccess('Restored', snapshot.name || '')
@@ -111,7 +107,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
           color: 'var(--v3-primary-text)', fontVariantNumeric: 'tabular-nums'
         }}>
           {subs.length} {subs.length === 1 ? 'sub' : 'subs'}
-          {totalRate > 0 ? ` · ${money(totalRate)}` : ''}
+          {totalRate > 0 ? ` · ${moneyCents(totalRate)}` : ''}
         </span>
       </div>
 
@@ -164,7 +160,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
           color: 'var(--v3-text-muted)', fontFamily: 'var(--font-body)',
           fontSize: 14, textAlign: 'center', lineHeight: 1.5
         }}>
-          No subs on this job. Add who's running each trade, rates roll into cost + margin live.
+          No subs on this job. Add who's running each trade. Their rates count toward cost and margin right away.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -217,7 +213,7 @@ export default function SubsSection({ contact, subs = [], userId, fetchAll }: an
                     color: 'var(--v3-primary-text)',
                     fontVariantNumeric: 'tabular-nums', minWidth: 60, textAlign: 'right'
                   }}>
-                    {money(s.rate)}
+                    {moneyCents(s.rate)}
                   </span>
                   <button
                     type="button"

@@ -173,11 +173,17 @@ test.describe('the Inbox list', () => {
     await expect(page.getByText('No conversations yet.', { exact: true })).toBeVisible()
   })
 
-  test('with the engine off it explains itself and points to Settings', async ({ context, page }, testInfo) => {
+  // dead-ends-5 and empty-start-7: Settings has no switch for messaging and
+  // nothing in the app turns it on, so the screen says who does instead of
+  // sending the owner to Settings to look for one.
+  test('with the engine off it says who turns messaging on, with no dead Settings button', async ({ context, page }, testInfo) => {
     await start(context, page, '/inbox')
     await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible()
     await expect(page.getByText('Inbox turns on with messaging', { exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Open settings' })).toHaveAttribute('href', '/settings')
+    await expect(page.getByRole('link', { name: 'Open settings' })).toHaveCount(0)
+    await expect(page.locator('#fh-main a[href="/settings"]')).toHaveCount(0)
+    await expect(page.getByText('The FieldHorse team turns messaging on for your company.')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'support@fieldhorse.com' })).toHaveAttribute('href', 'mailto:support@fieldhorse.com')
     await expect(page.locator('.fhi-rows')).toHaveCount(0)
     if (testInfo.project.name.startsWith('mobile')) {
       // And the dock still has Schedule, not Inbox.
@@ -187,11 +193,14 @@ test.describe('the Inbox list', () => {
     }
   })
 
-  test('a manager is told to ask an owner when the engine is off', async ({ context, page }) => {
+  // An owner or admin cannot turn it on either, so a manager reads the same
+  // line rather than being sent to them.
+  test('a manager is told who turns messaging on when the engine is off', async ({ context, page }) => {
     await start(context, page, '/inbox', { role: 'manager' })
     await expect(page.getByText('Inbox turns on with messaging', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Open settings' })).toHaveCount(0)
-    await expect(page.getByText('Ask an owner or an admin to turn it on.')).toBeVisible()
+    await expect(page.getByText('The FieldHorse team turns messaging on for your company.')).toBeVisible()
+    await expect(page.getByText('Ask an owner or an admin to turn it on.')).toHaveCount(0)
   })
 
   test('field roles cannot open the Inbox', async ({ context, page }) => {
@@ -208,6 +217,14 @@ test.describe('the Inbox list', () => {
     }
     await page.locator('.fhi-rows > li').first().getByRole('link').click()
     await expect(page).toHaveURL(/\/inbox\/conv-priya$/)
+  })
+
+  // dead-ends-7: an agent alert sent before the worker named the
+  // conversation links to /inbox?client=:id. It opens that client's
+  // conversation, not the whole list.
+  test('a link to a client opens that client\'s conversation', async ({ context, page }) => {
+    await start(context, page, '/inbox?client=cl-marcus', { tables: { ...ENGINE_ON, fh_v_inbox: INBOX } })
+    await expect(page).toHaveURL(/\/inbox\/conv-marcus$/, { timeout: 30_000 })
   })
 
   test('on a desktop the list sits beside the open conversation', async ({ context, page }, testInfo) => {
@@ -864,5 +881,51 @@ test.describe('sending exactly once, only when tapped and online', () => {
     await expect.poll(() => rpcCalls(context, 'fh_agent_run_reject').length).toBe(1)
     await expect(draftBox(page)).toHaveCount(0)
     await expect(replyField(page)).toBeFocused()
+  })
+})
+
+// Finding lost-work-7: a reply typed in a thread, and an edit to the
+// agent's draft, stay through Back to inbox and a reload until sent.
+test.describe('typed words in a thread', () => {
+  const WORDS = 'Saw cut joints at 10 ft, broom finish, no curing compound'
+
+  test('a typed reply stays through a reload', async ({ context, page }) => {
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill(WORDS)
+    await page.reload()
+    await expect(page.getByRole('textbox', { name: 'Write a reply' })).toHaveValue(WORDS)
+  })
+
+  test('a typed reply stays through Back to inbox on a phone', async ({ context, page, isMobile }) => {
+    test.skip(!isMobile, 'The phone thread has its own Back')
+    await openThread(context, page, { ...THREAD, fh_agent_runs: [] })
+    await page.getByRole('textbox', { name: 'Write a reply' }).fill(WORDS)
+    await page.getByRole('link', { name: 'Back to inbox' }).first().click()
+    await page.locator('.fhi-rows > li').filter({ hasText: 'Priya' }).first().getByRole('link').click()
+    await expect(page.getByRole('textbox', { name: 'Write a reply' })).toHaveValue(WORDS)
+  })
+
+  test("an edit to the agent's draft stays through a reload", async ({ context, page }) => {
+    await openThread(context, page)
+    await draftBox(page).fill('Of course, 11:30 works. See you then.')
+    await page.reload()
+    await expect(draftBox(page)).toHaveValue('Of course, 11:30 works. See you then.')
+  })
+
+  test("a restored edit to the agent's draft says so and can be discarded with a second tap", async ({ context, page }) => {
+    await openThread(context, page)
+    const original = await draftBox(page).inputValue()
+    await draftBox(page).fill('Of course, 11:30 works. See you then.')
+    await page.reload()
+    const card = page.getByRole('region', { name: 'Draft reply' })
+    await expect(card.getByText('Unsaved changes restored', { exact: true })).toBeVisible()
+    // The card's own Discard throws the agent's draft away; this one only
+    // forgets the edit.
+    await card.getByRole('button', { name: 'Discard changes', exact: true }).click()
+    await expect(draftBox(page)).toHaveValue('Of course, 11:30 works. See you then.')
+    await page.waitForTimeout(600)
+    await card.getByRole('button', { name: 'Tap again to discard', exact: true }).click()
+    await expect(draftBox(page)).toHaveValue(original)
+    await expect(card.getByText('Unsaved changes restored', { exact: true })).toHaveCount(0)
   })
 })

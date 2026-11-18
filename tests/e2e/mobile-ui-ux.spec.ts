@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { bigReady, ink, openBig, openBigPortal, textSize } from './helpers/bigText.ts'
 
 const selectionFixture = {
   id: 'selection-ui', user_id: 'qa-user-1', contact_id: 'c-job1', title: 'Bathroom floor',
@@ -431,4 +432,606 @@ test('refused task completion restores the row without a success message', async
   await expect(page.getByText("Couldn't complete", { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Complete Check delivery access' })).toBeVisible()
   await expect(page.getByText('Task completed', { exact: true })).toHaveCount(0)
+})
+
+// Large text and zoom (sign "the app falls apart at a bigger text size"):
+// long names and six or seven figure amounts on a Pixel 7 and a 360 px
+// phone, at the usual text size, with the phone's text at 150 percent, and
+// zoomed to 200 percent where a screen is used that way.
+test.describe('large text and zoom', () => {
+  test.skip(({ isMobile }) => !isMobile, 'Phone sizes')
+
+  // big-text-1: the Fieldhorse customer quote drew $184,580.00 as
+  // "$184,580.0" over a lone "0" on an ordinary phone.
+  for (const percent of [100, 150]) {
+    test(`the customer quote total stays whole on one line inside its card, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      for (const token of ['six', 'fh'] as const) {
+        await openBigPortal(context, page, token)
+        const total = page.locator('.fhp-total__amount')
+        await expect(total).toBeVisible({ timeout: 20_000 })
+        for (const width of [412, 390, 360, 320]) {
+          await page.setViewportSize({ width, height: 800 })
+          await page.waitForTimeout(150)
+          const drawn = await ink(total)
+          const card = await page.locator('.fhp-total').evaluate((el) => {
+            const r = el.getBoundingClientRect()
+            const s = getComputedStyle(el)
+            return { left: r.left + parseFloat(s.paddingLeft), right: r.right - parseFloat(s.paddingRight) }
+          })
+          const at = `${await total.textContent()} at ${width} px: ${JSON.stringify({ drawn, card })}`
+          expect(drawn.lines, at).toBe(1)
+          expect(drawn.left, at).toBeGreaterThanOrEqual(card.left - 0.5)
+          expect(drawn.right, at).toBeLessThanOrEqual(card.right + 0.5)
+        }
+      }
+    })
+  }
+
+  // big-text-2: the classic customer quote kept its totals box 300 px wide
+  // even on a narrower page, so Subtotal and Total lost their first letters
+  // off the left edge.
+  for (const percent of [100, 150]) {
+    test(`the classic customer quote keeps Subtotal and Total on the page, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBigPortal(context, page, 'classic')
+      const subtotal = page.locator('td', { hasText: /^Subtotal$/ })
+      await expect(subtotal).toBeAttached({ timeout: 20_000 })
+      const total = page.locator('span', { hasText: /^Total$/ }).last()
+      const figures = [subtotal.locator('xpath=following-sibling::td[1]'), total.locator('xpath=following-sibling::span[1]')]
+      for (const width of [412, 360, 340, 320, 206, 180]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(150)
+        const sheet = await subtotal.evaluate((el) => {
+          const r = (el.closest('article') as HTMLElement).getBoundingClientRect()
+          return { left: r.left, right: r.right }
+        })
+        for (const label of [subtotal, total, ...figures]) {
+          const drawn = await ink(label)
+          const at = `${await label.textContent()} at ${width} px: ${JSON.stringify({ drawn, sheet })}`
+          expect(drawn.left, at).toBeGreaterThanOrEqual(sheet.left - 0.5)
+          expect(drawn.right, at).toBeLessThanOrEqual(sheet.right + 0.5)
+        }
+      }
+    })
+  }
+
+  // big-text-3: a 44 px tap target made with negative margins let a client
+  // name or a job title on two lines spill over the line next to it.
+  for (const percent of [100, 150]) {
+    test(`a two line client name or job title keeps clear of the line next to it, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/quotes/q-big')
+      for (const width of [412, 390, 360, 320]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(150)
+        const name = await ink(page.locator('a.fhqt-client__link'))
+        const number = await ink(page.locator('.fhqt-client__number'))
+        const title = await ink(page.locator('h1.fhqt-title'))
+        const at = `quote at ${width} px: ${JSON.stringify({ title, name, number })}`
+        expect(name.top, at).toBeGreaterThanOrEqual(title.bottom - 1)
+        if (number.top > name.top + 1) expect(number.top, at).toBeGreaterThanOrEqual(name.bottom - 1)
+        expect(await page.locator('a.fhqt-client__link').evaluate((el) => el.getBoundingClientRect().height), at).toBeGreaterThanOrEqual(44)
+      }
+      await page.goto('/invoices/i-big')
+      await bigReady(page)
+      for (const width of [412, 390, 360, 320]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(150)
+        const who = await ink(page.locator('.fhinv-hero__who'))
+        const job = await ink(page.locator('a.fhinv-hero__job'))
+        const amount = await ink(page.locator('.fhinv-hero__amount'))
+        const at = `invoice at ${width} px: ${JSON.stringify({ who, job, amount })}`
+        expect(job.top, at).toBeGreaterThanOrEqual(who.bottom - 1)
+        expect(amount.top, at).toBeGreaterThanOrEqual(job.bottom - 1)
+        expect(await page.locator('a.fhinv-hero__job').evaluate((el) => el.getBoundingClientRect().height), at).toBeGreaterThanOrEqual(44)
+      }
+    })
+  }
+
+  // big-text-4: zoom or a bigger text size pushed Schedule, Money and the
+  // account button off the screen, and ran the dock labels together.
+  for (const percent of [100, 150, 200]) {
+    test(`every dock tab and header button stays on screen, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/jobs')
+      const widths = percent === 100 ? [412, 360, 320, 280, 240, 206, 180] : [412, 390, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 700 })
+        await page.waitForTimeout(250)
+        const shell = await page.evaluate(() => {
+          const vw = document.documentElement.clientWidth
+          const box = (el: Element) => { const r = el.getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) } }
+          const tabs = [...document.querySelectorAll('.fhs-dock__item')].map((el) => ({ name: el.textContent?.trim(), ...box(el) }))
+          const header = [...document.querySelectorAll('.fhs-header__menu, .fhs-header .fhs-icon-btn, .fh-glass-wordmark')]
+            .filter((el) => getComputedStyle(el).display !== 'none')
+            .map((el) => ({ name: el.getAttribute('aria-label') || el.className, ...box(el) }))
+          const labels = [...document.querySelectorAll('.fhs-dock__label')]
+            .map((el) => ({ name: el.textContent, ...box(el) }))
+            .filter((l) => l.width > 1)
+          // Closer than 6 px, two labels read as one ("MoneySchedule").
+          const touching = labels.flatMap((a, i) => labels.slice(i + 1).filter((b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > -6).map((b) => `${a.name} meets ${b.name}`))
+          return { vw, tabs, header, coin: box(document.querySelector('.fhs-dock__coin')!), touching }
+        })
+        const at = `${width} px: ${JSON.stringify(shell)}`
+        for (const control of [...shell.tabs, ...shell.header, shell.coin]) {
+          expect(control.left, at).toBeGreaterThanOrEqual(0)
+          expect(control.right, at).toBeLessThanOrEqual(shell.vw)
+        }
+        for (const tab of shell.tabs) expect(tab.width, at).toBeGreaterThanOrEqual(24)
+        expect(shell.touching, at).toEqual([])
+        for (const name of ['Today', 'Jobs', 'Money', 'Schedule']) {
+          await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name, exact: true }), at).toBeVisible()
+        }
+      }
+    })
+  }
+
+  // big-text-4 follow up: the dock measures its labels once and then on a
+  // change of size, not again on every route change.
+  test('the dock keeps one label watcher across route changes', async ({ context, page }) => {
+    await context.addInitScript(() => {
+      const Native = window.ResizeObserver
+      const w = window as unknown as { __dockWatchers: number }
+      w.__dockWatchers = 0
+      window.ResizeObserver = class extends Native {
+        observe(target: Element, options?: ResizeObserverOptions) {
+          if (target.matches?.('nav.fhs-dock')) w.__dockWatchers += 1
+          super.observe(target, options)
+        }
+      }
+    })
+    await openBig(context, page, '/jobs')
+    const dock = page.getByRole('navigation', { name: 'Primary' })
+    const watchers = () => page.evaluate(() => (window as unknown as { __dockWatchers: number }).__dockWatchers)
+    const first = await watchers()
+    expect(first).toBeGreaterThanOrEqual(1)
+    for (const name of ['Money', 'Schedule', 'Today', 'Jobs']) {
+      await dock.getByRole('link', { name, exact: true }).click()
+      await bigReady(page)
+    }
+    expect(await watchers()).toBe(first)
+  })
+
+  // big-text-5: the main action on a screen was cut to a few letters
+  // ("Mark comp…", "Send for appro…", "M") once zoom or bigger text left it
+  // less room than its label.
+  for (const percent of [100, 150, 200]) {
+    test(`main action buttons keep every word of their label, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      const widths = percent === 100 ? [412, 360, 280, 240, 206, 180] : [412, 360]
+      const screens = [
+        { path: '/jobs/c-big', label: 'Mark complete' },
+        { path: '/quotes/q-big', label: 'Send for approval' },
+        { path: '/invoices/i-big', label: 'Collect payment' },
+        { path: '/', label: 'Open job' }
+      ]
+      await openBig(context, page, '/jobs/c-big')
+      for (const screen of screens) {
+        if (screen.path !== '/jobs/c-big') {
+          await page.goto(screen.path)
+          await bigReady(page)
+        }
+        const button = page.locator('.fhc-btn', { hasText: screen.label }).first()
+        for (const width of widths) {
+          await page.setViewportSize({ width, height: 700 })
+          await page.waitForTimeout(200)
+          const shown = await button.evaluate((el) => {
+            const text = el.querySelector('.fhc-btn__text') as HTMLElement
+            const node = [...text.childNodes].find((n) => n.nodeType === 3)!
+            const split: string[] = []
+            for (const m of (node.textContent || '').matchAll(/\S+/g)) {
+              const range = document.createRange()
+              range.setStart(node, m.index!)
+              range.setEnd(node, m.index! + m[0].length)
+              if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) split.push(m[0])
+            }
+            const r = el.getBoundingClientRect()
+            const t = text.getBoundingClientRect()
+            const cut = text.scrollWidth > text.clientWidth + 1 || t.top < r.top - 0.5 || t.bottom > r.bottom + 0.5
+            return { cut, split, left: r.left, right: r.right, window: document.documentElement.clientWidth }
+          })
+          const at = `${screen.label} at ${width} px: ${JSON.stringify(shown)}`
+          expect(shown.cut, at).toBe(false)
+          expect(shown.split, at).toEqual([])
+          expect(shown.left, at).toBeGreaterThanOrEqual(0)
+          expect(shown.right, at).toBeLessThanOrEqual(shown.window)
+        }
+      }
+    })
+  }
+
+  // big-text-7: the quote total sat beside "Total" at a fixed 30 px and ran
+  // off the right edge (the cents gone) with larger text or zoom.
+  for (const percent of [100, 130, 150]) {
+    test(`the quote total stays whole inside its tray, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/quotes/q-big')
+      const amount = page.locator('.fhqt-total__amount')
+      const widths = percent === 100 ? [412, 360, 280, 206, 180] : [412, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const drawn = await ink(amount)
+        const label = await ink(page.locator('.fhqt-total__label'))
+        const tray = await page.locator('.fhqt-total').evaluate((el) => {
+          const r = el.getBoundingClientRect()
+          const s = getComputedStyle(el)
+          return { left: r.left + parseFloat(s.paddingLeft), right: r.right - parseFloat(s.paddingRight) }
+        })
+        const at = `${await amount.textContent()} at ${width} px: ${JSON.stringify({ drawn, label, tray })}`
+        expect(drawn.lines, at).toBe(1)
+        expect(drawn.left, at).toBeGreaterThanOrEqual(tray.left - 0.5)
+        expect(drawn.right, at).toBeLessThanOrEqual(tray.right + 0.5)
+        expect(label.left, at).toBeGreaterThanOrEqual(tray.left - 0.5)
+      }
+    })
+  }
+
+  // What is wrong with a set of rows: a name, status or amount off the
+  // screen, or a word broken inside itself.
+  const rowProblems = (all: Element[]) => {
+    const vw = document.documentElement.clientWidth
+    const words = (el: Element) => {
+      const split: string[] = []
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        for (const m of (node.textContent || '').matchAll(/\S+/g)) {
+          const range = document.createRange()
+          range.setStart(node, m.index!)
+          range.setEnd(node, m.index! + m[0].length)
+          if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) split.push(m[0])
+        }
+      }
+      return split
+    }
+    const problems: string[] = []
+    for (const row of all) {
+      const name = row.querySelector('.fhc-row__title')?.textContent?.slice(0, 30)
+      for (const el of row.querySelectorAll('.fhc-row__money, .fhc-chip, .fhc-row__title')) {
+        const r = el.getBoundingClientRect()
+        if (r.width === 0) continue
+        if (r.left < -0.5 || r.right > vw + 0.5) problems.push(`${name}: ${el.textContent} spans ${Math.round(r.left)}..${Math.round(r.right)}`)
+        const split = words(el)
+        if (split.length) problems.push(`${name}: ${split.join(', ')} broken across lines`)
+      }
+    }
+    return problems
+  }
+
+  // big-text-6: list rows kept the amount and status beside the name at
+  // any width, so at a big zoom or text size the cents ran off the edge
+  // and names were squeezed into a sliver, broken inside words.
+  for (const percent of [100, 150, 200]) {
+    test(`list rows keep the name, status and amount readable, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/jobs')
+      const widths = percent === 100 ? [412, 360, 280, 240, 206, 180] : [412, 360]
+      for (const path of ['/jobs', '/quotes', '/invoices']) {
+        if (path !== '/jobs') {
+          await page.goto(path)
+          await bigReady(page)
+        }
+        for (const width of widths) {
+          await page.setViewportSize({ width, height: 800 })
+          await page.waitForTimeout(200)
+          const rows = await page.locator('#fh-main .fhc-row').evaluateAll(rowProblems)
+          expect(rows, `${path} at ${width} px`).toEqual([])
+        }
+      }
+      // The quote lines on the customer's page.
+      await openBigPortal(context, page, 'fh')
+      await expect(page.locator('.fhp-lines .fhc-row').first()).toBeVisible({ timeout: 20_000 })
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const rows = await page.locator('.fhp-lines .fhc-row').evaluateAll(rowProblems)
+        expect(rows, `/p/fh at ${width} px`).toEqual([])
+      }
+    })
+  }
+
+  // big-text-8: a client's three figures sat in equal thirds, so on a
+  // narrow phone "$3.72M" ran into "$3.47M" and read as one number.
+  for (const percent of [100, 150]) {
+    test(`a client's lifetime, balance and active figures never run into each other, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/clients/cl-big')
+      const widths = percent === 100 ? [412, 360, 340, 320, 206, 180] : [412, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const figures = await page.locator('#fh-main .fh-eyebrow', { hasText: /^Lifetime$/ }).first().evaluate((eyebrow) => {
+          const row = eyebrow.parentElement!.parentElement!
+          return [...row.children].map((metric) => {
+            const number = metric.lastElementChild!
+            const range = document.createRange()
+            range.selectNodeContents(number)
+            const rects = [...range.getClientRects()]
+            return {
+              text: number.textContent,
+              left: Math.min(...rects.map((r) => r.left)), right: Math.max(...rects.map((r) => r.right)),
+              top: Math.min(...rects.map((r) => r.top)), bottom: Math.max(...rects.map((r) => r.bottom)),
+              lines: new Set(rects.map((r) => Math.round(r.top))).size
+            }
+          })
+        })
+        const vw = await page.evaluate(() => document.documentElement.clientWidth)
+        const at = `${width} px: ${JSON.stringify(figures)}`
+        expect(figures.length, at).toBe(3)
+        for (const [n, a] of figures.entries()) {
+          expect(a.lines, at).toBe(1)
+          expect(a.left, at).toBeGreaterThanOrEqual(0)
+          expect(a.right, at).toBeLessThanOrEqual(vw)
+          for (const b of figures.slice(n + 1)) {
+            const apart = a.right + 4 <= b.left || b.right + 4 <= a.left || a.bottom <= b.top || b.bottom <= a.top
+            expect(apart, `${a.text} and ${b.text} at ${at}`).toBe(true)
+          }
+        }
+      }
+    })
+  }
+
+  // big-text-9: on Today a visit's address was squeezed beside Navigate and
+  // broken inside words ("Murfreesb" over "oro"), and Navigate was cut.
+  for (const percent of [100, 150]) {
+    test(`a visit address on Today keeps whole words and a whole Navigate, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/')
+      const address = page.locator('.fht-visit__address').first()
+      const navigate = page.locator('.fht-visit__wherein .fhc-btn').first()
+      // 195 px is the narrowest the finding measured. At 180 px the whole
+      // visit card (its time and status columns) is wider than the window,
+      // which is a separate layout limit.
+      const widths = percent === 100 ? [412, 360, 320, 206, 195] : [412, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const shown = await address.evaluate((el) => {
+          const node = [...el.childNodes].find((n) => n.nodeType === 3 && (n.textContent || '').trim())!
+          const broken: string[] = []
+          for (const m of (node.textContent || '').matchAll(/\S+/g)) {
+            const range = document.createRange()
+            range.setStart(node, m.index!)
+            range.setEnd(node, m.index! + m[0].length)
+            if (new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size > 1) broken.push(m[0])
+          }
+          return { width: Math.round(el.getBoundingClientRect().width), broken }
+        })
+        // The quiet button's right padding sits past the text on purpose;
+        // its label and arrow have to be on screen.
+        const nav = await navigate.evaluate((el) => {
+          const text = el.querySelector('.fhc-btn__text') as HTMLElement
+          const r = (el.querySelector('.fhc-btn__label') as HTMLElement).getBoundingClientRect()
+          return { right: r.right, cut: text.scrollWidth > text.clientWidth + 1, window: document.documentElement.clientWidth }
+        })
+        const at = `${width} px: ${JSON.stringify({ shown, nav })}`
+        expect(shown.broken, at).toEqual([])
+        expect(nav.cut, at).toBe(false)
+        expect(nav.right, at).toBeLessThanOrEqual(nav.window)
+      }
+    })
+  }
+
+  // big-text-10: the Schedule filters shrank below their labels instead of
+  // scrolling, so "Upcoming 3" was drawn over "Done 0".
+  for (const percent of [100, 150]) {
+    test(`the Schedule filters keep their labels apart and scroll sideways, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/schedule')
+      const widths = percent === 100 ? [412, 360, 320, 300, 260, 206, 180] : [412, 390, 360]
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.waitForTimeout(200)
+        const strips = await page.locator('.dispatch-state').evaluateAll((all) => all.map((strip) => {
+          const options = [...strip.querySelectorAll('.dispatch-state__opt')].map((o) => {
+            const r = o.getBoundingClientRect()
+            return { label: (o.textContent || '').trim(), left: r.left, right: r.right, width: Math.round(r.width), needs: o.scrollWidth }
+          })
+          const box = strip.getBoundingClientRect()
+          return { options, right: box.right, window: document.documentElement.clientWidth }
+        }))
+        const at = `${width} px: ${JSON.stringify(strips)}`
+        for (const strip of strips) {
+          expect(strip.right, at).toBeLessThanOrEqual(strip.window)
+          for (const [n, o] of strip.options.entries()) {
+            expect(o.needs, at).toBeLessThanOrEqual(o.width + 1)
+            if (n > 0) expect(o.left, at).toBeGreaterThanOrEqual(strip.options[n - 1].right - 0.5)
+          }
+        }
+      }
+    })
+  }
+
+  // big-text-1 and big-text-7 carried to every big figure: a money amount
+  // never breaks inside the number and never runs off the screen or out of
+  // the card that clips it ("$1,345,679.0" cut at the card edge, a quote
+  // line's "$1,234,567./89").
+  for (const percent of [100, 150]) {
+    test(`every money figure stays whole on one line and on screen, text at ${percent} percent`, async ({ context, page }) => {
+      await textSize(context, percent)
+      await openBig(context, page, '/invoices')
+      for (const path of ['/invoices', '/invoices/i-big', '/quotes/q-big', '/jobs/c-big']) {
+        if (path !== '/invoices') {
+          await page.goto(path)
+          await bigReady(page)
+        }
+        for (const width of [412, 360]) {
+          await page.setViewportSize({ width, height: 800 })
+          await page.waitForTimeout(250)
+          const problems = await page.evaluate(() => {
+            const vw = document.documentElement.clientWidth
+            const found: string[] = []
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+              const host = node.parentElement
+              if (!host || host.closest('[aria-hidden="true"], script, style')) continue
+              const style = getComputedStyle(host)
+              if (style.visibility !== 'visible' || host.getClientRects().length === 0) continue
+              for (const m of (node.textContent || '').matchAll(/-?\$\d[\d,]*(\.\d+)?[KM]?/g)) {
+                const range = document.createRange()
+                range.setStart(node, m.index!)
+                range.setEnd(node, m.index! + m[0].length)
+                const rects = [...range.getClientRects()].filter((r) => r.width > 0 && r.height > 0)
+                if (rects.length === 0) continue
+                const left = Math.min(...rects.map((r) => r.left))
+                const right = Math.max(...rects.map((r) => r.right))
+                // Visually hidden text (a 1 px clipped box) is for screen readers.
+                if (right - left < 2) continue
+                const where = `${m[0]} in .${host.className.toString().split(' ')[0]}`
+                if (new Set(rects.map((r) => Math.round(r.top))).size > 1) found.push(`${where} broken across lines`)
+                if (left < -0.5 || right > vw + 0.5) found.push(`${where} spans ${Math.round(left)}..${Math.round(right)} in a ${vw} px window`)
+                for (let el: Element | null = host; el && el !== document.body; el = el.parentElement) {
+                  const s = getComputedStyle(el)
+                  if (s.overflowX !== 'hidden' && s.overflowX !== 'clip') continue
+                  const box = el.getBoundingClientRect()
+                  if (box.width < 2) break
+                  if (left < box.left - 0.5 || right > box.right + 0.5) {
+                    found.push(`${where} spans ${Math.round(left)}..${Math.round(right)}, clipped by .${el.className.toString().split(' ')[0]} at ${Math.round(box.left)}..${Math.round(box.right)}`)
+                  }
+                  break
+                }
+              }
+            }
+            return found
+          })
+          expect.soft(problems, `${path} at ${width} px`).toEqual([])
+        }
+      }
+    })
+  }
+})
+
+// big-text-3 on a desktop window at 200 percent zoom (640 px wide).
+test('a two line job title keeps clear of the client name on a zoomed desktop invoice', async ({ context, page }, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop window')
+  await page.setViewportSize({ width: 640, height: 450 })
+  await openBig(context, page, '/invoices/i-big')
+  const who = await ink(page.locator('.fhinv-hero__who'))
+  const job = await ink(page.locator('a.fhinv-hero__job'))
+  expect(job.top, JSON.stringify({ who, job })).toBeGreaterThanOrEqual(who.bottom - 1)
+})
+
+// A phone keyboard, as iOS Safari and Chrome on Android draw it by
+// default: the page keeps its full height and only the visual viewport
+// shrinks, to about 55 percent of the screen. A page scale shrinks the
+// visual viewport the same way and keeps window.innerHeight. Then the
+// browser brings the focused field into what is left, as a phone does.
+async function keyboardUp(context: import('@playwright/test').BrowserContext, page: import('@playwright/test').Page, field: import('@playwright/test').Locator) {
+  const height = page.viewportSize()!.height
+  const cdp = await context.newCDPSession(page)
+  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: height / Math.round(height * 0.55) })
+  await page.waitForTimeout(400)
+  await field.evaluate((el) => {
+    const vv = window.visualViewport!
+    const r = el.getBoundingClientRect()
+    if (r.top < vv.offsetTop || r.bottom > vv.offsetTop + vv.height) el.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await page.waitForTimeout(400)
+}
+
+/** Where a box sits against the part of the page the keyboard leaves. */
+function aboveKeyboard(target: import('@playwright/test').Locator) {
+  return target.evaluate((el) => {
+    const vv = window.visualViewport!
+    const r = el.getBoundingClientRect()
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), visibleTop: Math.round(vv.offsetTop), visibleBottom: Math.round(vv.offsetTop + vv.height), inView: r.top >= vv.offsetTop - 0.5 && r.bottom <= vv.offsetTop + vv.height + 0.5 }
+  })
+}
+
+function writesTo(page: import('@playwright/test').Page, table: string) {
+  const writes: string[] = []
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (url.pathname === `/rest/v1/${table}` && !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) writes.push(request.method())
+  })
+  return writes
+}
+
+test.describe('phone keyboard', () => {
+  test.skip(({ isMobile }) => !isMobile, 'Phone keyboard')
+
+  // keyboard-1: the floating Save on Settings stayed at the dock's height,
+  // under the keyboard, and Enter in a field did nothing.
+  test('Settings keeps Save above the keyboard and Enter in a field saves', async ({ context, page }) => {
+    await signIn(context)
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' })
+    const field = page.getByPlaceholder('Your company')
+    await expect(field).toBeVisible({ timeout: 30_000 })
+    await page.waitForTimeout(500)
+    // The field already in the top half, so the browser has no reason to move.
+    await field.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 200))
+    const writes = writesTo(page, 'profiles')
+    await field.click()
+    await field.fill('Parker Concrete LLC')
+    const save = page.locator('.fh-settings-save-bar button')
+    await expect(save).toBeEnabled()
+    await keyboardUp(context, page, field)
+    await expect.poll(async () => (await aboveKeyboard(save)).inView, { message: JSON.stringify(await aboveKeyboard(save)) }).toBe(true)
+    expect((await aboveKeyboard(field)).inView).toBe(true)
+    await field.press('Enter')
+    await expect.poll(() => writes.length, { message: 'Enter saved the change' }).toBeGreaterThan(0)
+  })
+
+  // keyboard-1: the same on a sub's profile, whose Save sticks to the
+  // bottom of the page.
+  test("a sub's profile keeps Save above the keyboard and Enter in a field saves", async ({ context, page }) => {
+    await signIn(context, {
+      tables: {
+        fh_sub_profiles: [{
+          id: 'sp-1', user_id: 'qa-user-1', org_id: 'org-1', identity_key: 'acme pumping', name: 'Acme Pumping', phone: '555-0199',
+          email: 'office@acme.example', trade: 'Concrete pumping', notes: 'Call before 7 am.', created_at: '2026-09-01T12:00:00Z'
+        }]
+      }
+    })
+    await page.goto('/subs/acme%20pumping', { waitUntil: 'domcontentloaded' })
+    const bar = page.locator('.fh-subdetail-savebar')
+    await expect(bar).toBeVisible({ timeout: 30_000 })
+    await page.waitForTimeout(500)
+    const field = page.locator('.fh-app input:not([type=checkbox]):not([type=file]):not([type=date])').first()
+    const writes = writesTo(page, 'fh_sub_profiles')
+    await field.click()
+    await field.fill('Acme Pumping LLC')
+    const save = bar.locator('button')
+    await expect(save).toBeEnabled()
+    await keyboardUp(context, page, field)
+    await expect.poll(async () => (await aboveKeyboard(save)).inView, { message: JSON.stringify(await aboveKeyboard(save)) }).toBe(true)
+    expect((await aboveKeyboard(field)).inView).toBe(true)
+    await field.press('Enter')
+    await expect.poll(() => writes.length, { message: 'Enter saved the change' }).toBeGreaterThan(0)
+  })
+
+  // keyboard-3: a record search list kept its usual height under the field,
+  // so with the keyboard up its last results sat under the keyboard and
+  // could not be scrolled into sight from inside the list.
+  for (const route of ['/schedule/new', '/compose']) {
+    test(`the record list on ${route} keeps its last result above the keyboard`, async ({ context, page }) => {
+      await signIn(context)
+      await page.goto(route, { waitUntil: 'domcontentloaded' })
+      const input = page.locator('.fh-record-picker input').first()
+      await expect(input).toBeVisible({ timeout: 30_000 })
+      await input.scrollIntoViewIfNeeded()
+      await input.click()
+      await expect(page.locator('.fh-record-picker__list [role="option"]').first()).toBeVisible()
+      await keyboardUp(context, page, input)
+      const reading = () => page.evaluate(() => {
+        const vv = window.visualViewport!
+        const list = document.querySelector<HTMLElement>('.fh-record-picker__list')!
+        list.scrollTop = list.scrollHeight
+        const options = [...list.querySelectorAll('[role="option"]')]
+        const box = list.getBoundingClientRect()
+        const bottom = vv.offsetTop + vv.height
+        return {
+          list: [Math.round(box.top), Math.round(box.bottom)], visible: [Math.round(vv.offsetTop), Math.round(bottom)],
+          rows: options.length, hidden: options.filter((o) => o.getBoundingClientRect().bottom > bottom + 0.5).length,
+          listInView: box.top >= vv.offsetTop - 0.5 && box.bottom <= bottom + 0.5, height: Math.round(box.height)
+        }
+      })
+      await expect.poll(async () => (await reading()).hidden, { message: JSON.stringify(await reading()) }).toBe(0)
+      const end = await reading()
+      expect(end.listInView, JSON.stringify(end)).toBe(true)
+      expect(end.height, JSON.stringify(end)).toBeGreaterThanOrEqual(96)
+      await expect(input).toBeFocused()
+    })
+  }
 })

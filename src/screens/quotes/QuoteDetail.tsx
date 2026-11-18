@@ -30,6 +30,8 @@ import { invalidateAfterQuoteWrite, makeJobFromQuote, plainQuoteError, quoteNumb
 import { recordRoute } from '../../lib/records.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../lib/quoteView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { sendKey, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
+import { useFitWidth } from '../../lib/useFitWidth.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { useQuoteItems } from '../ContactDetail/sections/QuoteItems.tsx'
 import { shortDate, statusChip } from '../ContactDetail/lib/quoteStatus.ts'
@@ -196,6 +198,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const live = useMemo(() => buildQuoteView(lines.effective, terms), [lines.effective, terms])
   const loadingMoney = useMemo(() => buildQuoteView([], terms).money, [terms])
   const capsule = quoteCapsule(items.loading ? loadingMoney : live.money)
+  const totalRef = useFitWidth<HTMLSpanElement>(capsule.amount)
 
   // The customer's email, read fresh from the client each time the screen
   // opens (lib/customerEmail.ts), never a copy from before: the address may
@@ -213,10 +216,15 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const [busy, setBusy] = useState<Busy>(null)
   // The same busy flag, read at once: two taps in one frame both saw null.
   const busyRef = useRef<Busy>(null)
+  // The proposal email and the signature request are kept app wide
+  // (lib/invoiceSends), not in this screen: leave the quote while one is
+  // still going out and come back, and it is still busy.
+  const emailOut = useSendInFlight(sendKey.quote(quote.id))
+  const esignOut = useSendInFlight(sendKey.quoteSignature(quote.id))
   // A line still being added is not in the database the document, the
   // approval and the job are built from, so they all wait for it.
   const lineSaving = Boolean(lines.lineSaving)
-  const waiting = items.loading || busy !== null || lines.switchSaving || lineSaving
+  const waiting = items.loading || busy !== null || emailOut || esignOut || lines.switchSaving || lineSaving
   const needsLines = !items.loading && !live.canSend
   const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
   const sendHint = lost
@@ -245,9 +253,16 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }
 
   const onSend = () => run('send', async () => {
-    const outcome = await sendQuoteByEmail({ quote, company: await loadCompany(), userId: userId as string, recipientEmail, preferences: profile?.preferences })
+    const end = startSend(sendKey.quote(quote.id))
+    if (!end) return
+    let outcome
+    try {
+      outcome = await sendQuoteByEmail({ quote, company: await loadCompany(), userId: userId as string, recipientEmail, preferences: profile?.preferences })
+    } finally {
+      end(outcome?.kind === 'sent')
+    }
     if (outcome.kind === 'sender_not_configured') {
-      toastError('Email sender is not configured yet', 'The PDF is saved. Ask whoever set up the deploy to add the Resend keys.')
+      toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
       await downloadQuotePdf(outcome.result)
       return
     }
@@ -325,9 +340,16 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }, "Couldn't download")
 
   const onEsign = () => run('esign', async () => {
-    const outcome = await sendQuoteForSignature({ quote, company: await loadCompany(), userId: userId as string, recipientEmail })
+    const end = startSend(sendKey.quoteSignature(quote.id))
+    if (!end) return
+    let outcome
+    try {
+      outcome = await sendQuoteForSignature({ quote, company: await loadCompany(), userId: userId as string, recipientEmail })
+    } finally {
+      end(outcome === 'sent')
+    }
     if (outcome === 'esign_not_configured') {
-      toastError('DocuSign not connected yet', 'Add the DocuSign keys in Netlify, then try again.')
+      toastError('E-signature is not set up yet', 'Send the quote link instead.')
       return
     }
     await refresh()
@@ -481,7 +503,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
         </section>
       )}
 
-      <QuoteLines items={items} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onEditorClosed={onEditorClosed} onChange={setLines} />
+      <QuoteLines items={items} quoteId={quote.id} userId={userId} who={who} money={terms} focusRef={titleRef} startAdding={startAdding} locked={approved} onEditorClosed={onEditorClosed} onChange={setLines} />
 
       {approved && (
         <section className="fhqt-panel" aria-labelledby="fhqt-approved-title">
@@ -507,7 +529,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
       <section className="fhqt-total" aria-label="Total">
         <div className="fhqt-total__row">
           <span className="fhqt-total__label">Total</span>
-          <span className="fhqt-total__amount">{capsule.amount}</span>
+          <span className="fhqt-total__amount" ref={totalRef}>{capsule.amount}</span>
         </div>
         <p className="fhqt-total__note">{capsule.note}</p>
         <Button
@@ -515,7 +537,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
           size="lg"
           block
           disabled={waiting || lost || !live.canSend || !emailKnown}
-          loading={busy === 'send' || busy === 'share'}
+          loading={busy === 'send' || busy === 'share' || emailOut}
           onClick={hasEmail ? onSend : onShare}
         >
           {sendLabel}

@@ -212,7 +212,7 @@ export default function SnowNotesBuild(props: Props) {
                   className="fh-build-capture__textarea"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="What happened on site? Speak or type, AI will pull out action items, risks, and materials."
+                  placeholder="What happened on site? Speak or type, and AI will pull out action items, risks, and materials."
                   rows={4}
                   style={{ background: 'var(--v3-surface)', border: '1px solid var(--v3-border-strong)', fontSize: 16 }}
                 />
@@ -288,7 +288,7 @@ export default function SnowNotesBuild(props: Props) {
                 <div className="fh-build-table__empty" role="status" aria-busy="true">Loading reports…</div>
               )}
               {!loading && !failed && recent.length === 0 && (
-                <div className="fh-build-table__empty">{historyQuery ? 'No reports match your search. Try another word, job or address.' : 'No reports yet, start one above.'}</div>
+                <div className="fh-build-table__empty">{historyQuery ? 'No reports match your search. Try another word, job or address.' : 'No reports yet. Start one above.'}</div>
               )}
               {!loading && recent.map((n: any) => {
                 const linkedJob = contacts.find((c) => c.id === n.contact_id)

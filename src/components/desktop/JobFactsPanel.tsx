@@ -8,19 +8,22 @@
 // else. Sections never draw a blank: each has one quiet line for when
 // there is nothing to show yet.
 //
-// Rows that lead somewhere are real buttons that open the section tab
-// that holds the record, and are plain text when the job's stage does
-// not offer that tab.
+// Rows that lead somewhere are real controls: an invoice opens its own
+// screen, and the other rows open the section tab that holds the record,
+// or are plain text when the job's stage does not offer that tab.
 
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { Button, VaultCard } from '../fh/index.ts'
 import type { VaultFact } from '../fh/index.ts'
+import { formatPhone } from '../../lib/utils.ts'
 import { initialsFor } from '../fh/Monogram.tsx'
 import { moneyCents } from '../../lib/format.ts'
 import { navigateHrefHere } from '../../lib/todayView.ts'
 import type { JobMoney } from '../../screens/ContactDetail/lib/spine.ts'
 import { documentRows, MAX_FILE_ROWS } from '../../screens/ContactDetail/lib/jobDesktop.ts'
+import { useDocumentCompanyName } from '../../lib/companyBranding.ts'
 import type { DocumentRow } from '../../screens/ContactDetail/lib/jobDesktop.ts'
 import { useJobCrew, useJobDocumentSources, useJobPartners } from '../../screens/ContactDetail/hooks/useJobFacts.ts'
 import './job-desktop.css'
@@ -93,8 +96,10 @@ export default function JobFactsPanel({
   const sources = useJobDocumentSources(jobId, canSeeMoney)
   const crew = useJobCrew(crewIds)
 
+  const companyName = useDocumentCompanyName(contact?.org_id)
   const documents = documentRows({
     contact,
+    companyName,
     invoices: sources.invoices,
     files: sources.files,
     canSeeMoney,
@@ -124,6 +129,14 @@ export default function JobFactsPanel({
         {row.detail && <span className="fhd-doc__detail">{row.detail}</span>}
       </>
     )
+    // An invoice opens its own screen; the quote and files open their tab.
+    if (row.to) {
+      return (
+        <li key={row.id}>
+          <Link className="fhd-doc fhd-doc--link" to={row.to}>{body}</Link>
+        </li>
+      )
+    }
     return has(row.tab) ? (
       <li key={row.id}>
         <button type="button" className="fhd-doc fhd-doc--link" onClick={() => onOpenTab(row.tab)}>{body}</button>
@@ -156,7 +169,7 @@ export default function JobFactsPanel({
             ) : (
               <p className="fhd-person__name">{customerName}</p>
             )}
-            {phone && <a className="fhd-link fhd-person__line" href={`tel:${phone}`}>{phone}</a>}
+            {phone && <a className="fhd-link fhd-person__line" href={`tel:${phone}`}>{formatPhone(phone)}</a>}
             {email && <a className="fhd-link fhd-person__line" href={`mailto:${email}`}>{email}</a>}
           </div>
         </div>
