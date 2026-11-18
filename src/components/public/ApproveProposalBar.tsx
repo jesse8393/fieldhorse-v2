@@ -24,6 +24,7 @@ import { money } from '../documents/format.ts'
 import { companyShortName } from '../../lib/quoteMoney.ts'
 import { personFirstName } from '../../lib/quoteView.ts'
 import '../documents/fieldhorse-proposal.css'
+import { errorKind, plainError } from '../../lib/serviceErrors.ts'
 
 /**
  * What the page found when it read the quote again just before posting an
@@ -40,6 +41,12 @@ export type ApproveCheck =
 
 // What the customer reads for an error the link answers, the same words
 // whether the read before an approval or the approval itself got it.
+// A dropped connection, in the homeowner's words: who could not be
+// reached, what to tap again and that nothing happened yet (raw-errors-8).
+function unreachableText(companyName: string, retry: string, nothingYet: string): string {
+  return `We could not reach ${companyName || 'the contractor'} just now. Check your connection and tap ${retry} again. ${nothingYet}`
+}
+
 function approveErrorText(error: unknown, message: unknown, docLabel: string, companyName: string, fallback: string): string {
   if (error === 'already_approved') return `This ${docLabel} has already been approved, thank you.`
   if (error === 'expired') return 'This link has expired. Please ask the contractor for a fresh one.'
@@ -109,6 +116,8 @@ export default function ApproveProposalBar({
   const askable = canAsk !== false
 
   const ready = name.trim().length > 1 && authorized && !busy
+  // The approve button's own words, for a message that says tap it again.
+  const approveLabel = skin === 'fieldhorse' && !isCO ? 'Approve this quote' : 'Approve & notify contractor'
   // A seeded question that is still only its prefilled lead in has nothing
   // to send yet: sending it would pause approval with an empty request.
   const seedText = String(requestSeed?.text || '').trim()
@@ -190,7 +199,9 @@ export default function ApproveProposalBar({
       })
       onApproved?.()
     } catch (err: any) {
-      setError(err.message || 'Something went wrong.')
+      setError(errorKind(err) === 'offline'
+        ? unreachableText(companyName, approveLabel, 'Nothing was approved yet.')
+        : plainError(err, 'We could not record your approval. Please try again.'))
     } finally {
       setBusy(false)
     }
@@ -232,7 +243,9 @@ export default function ApproveProposalBar({
       })
       onRequested?.()
     } catch (err: any) {
-      setError(err.message || 'Something went wrong.')
+      setError(errorKind(err) === 'offline'
+        ? unreachableText(companyName, 'Send request', 'Your request was not sent yet.')
+        : plainError(err, 'We could not send your request. Please try again.'))
     } finally {
       setBusy(false)
     }

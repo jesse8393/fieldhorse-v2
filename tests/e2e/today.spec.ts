@@ -5,6 +5,7 @@
 // column holds what needs an answer and the week strip.
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn, type SignInOptions } from './helpers/signIn.ts'
+import { expectPlain, failRest } from './helpers/rawErrors.ts'
 
 // The mock company sits in Murfreesboro, Tennessee, so the phone runs on
 // Central time and the clock is fixed: Thursday, October 8, 2026.
@@ -506,4 +507,20 @@ test.describe('today on a desktop', () => {
     await expect(page.getByRole('region', { name: /Needs an answer/ })).toHaveCount(0)
     await expect(page.getByRole('region', { name: 'This week' })).toHaveCount(0)
   })
+})
+
+// raw-errors-5: Today's error card read "Home dashboard contacts failed:
+// permission denied for table fh_contacts" or "TypeError: Failed to fetch".
+test("Today's error card says what to do in plain words", async ({ context, page }) => {
+  test.setTimeout(90_000)
+  await signIn(context, { tables: { fh_schedule: SCHEDULE } })
+  await context.route('https://api.open-meteo.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast()) })
+  )
+  await failRest(context, 'fh_contacts', 'GET', 'abort')
+  await page.clock.setFixedTime(MORNING)
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const card = page.getByRole('alert').filter({ hasText: 'Today could not load' })
+  await expectPlain(card, 'No signal right now. Try again when the signal is back.')
+  await expect(card.getByRole('button', { name: /Retry/ })).toBeVisible()
 })

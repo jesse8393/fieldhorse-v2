@@ -247,7 +247,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const onSend = () => run('send', async () => {
     const outcome = await sendQuoteByEmail({ quote, company: await loadCompany(), userId: userId as string, recipientEmail, preferences: profile?.preferences })
     if (outcome.kind === 'sender_not_configured') {
-      toastError('Email sender is not configured yet', 'The PDF is saved. Ask whoever set up the deploy to add the Resend keys.')
+      toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
       await downloadQuotePdf(outcome.result)
       return
     }
@@ -327,7 +327,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const onEsign = () => run('esign', async () => {
     const outcome = await sendQuoteForSignature({ quote, company: await loadCompany(), userId: userId as string, recipientEmail })
     if (outcome === 'esign_not_configured') {
-      toastError('DocuSign not connected yet', 'Add the DocuSign keys in Netlify, then try again.')
+      toastError('E-signature is not set up yet', 'Send the quote link instead.')
       return
     }
     await refresh()

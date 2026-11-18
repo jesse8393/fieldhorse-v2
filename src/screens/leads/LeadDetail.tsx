@@ -34,6 +34,7 @@ import { formatPhone } from '../../lib/utils.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { toastError } from '../../lib/toast.ts'
 import './leads.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Visit = { id: string; title: string | null; start_at: string | null; end_at: string | null }
 type Note = { id: string; text: string | null; created_at: string | null; category: string | null }
@@ -224,7 +225,7 @@ export default function LeadDetail({ id, fallback }: LeadDetailProps) {
       void queryClient.invalidateQueries({ queryKey: homeDashboardKey(user?.id).slice(0, 2) })
       return true
     } catch (e) {
-      toastError(e instanceof Error ? e.message : 'Could not save the lead.', 'Check your connection and try again.')
+      toastError(plainError(e, 'Could not save the lead.'), 'Check your connection and try again.')
       return false
     } finally {
       setBusy(false)

@@ -3,6 +3,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { installMock, restResponse, session } from '../../scripts/qa-mock.mjs'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
 import { signIn } from './helpers/signIn.ts'
+import { FAIL, expectPlain, failRest } from './helpers/rawErrors.ts'
 
 // The invoice screen's actions (Phase 9, Task 12, decisions D57 and D62):
 // the gold Collect payment, then Resend (Send on a draft), PDF and Share
@@ -449,6 +450,68 @@ test("Email on the job's money view goes to the client's current email", async (
   await email.click()
   await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
   expect(sends[0].recipient_email).toBe('jeff@roy.com')
+})
+
+// raw-errors-7: a refused send showed the provider's English, its HTTP code
+// and web address; a send after the sign in ran out showed invalid_token.
+test('a refused send says in plain words that the email did not go out', async ({ page, context }) => {
+  await installShedInvoice(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+  let answer: { status: number; json: object } = { status: 502, json: { error: 'send_failed', provider_status: 403, detail: 'The gmail.com domain is not verified. Please, add and verify your domain on https://resend.com/domains' } }
+  await context.route('**/api/send-invoice', (route) => route.fulfill(answer))
+  await openInvoice(page, 'inv-1')
+  const toasts = page.locator('[data-sonner-toaster]')
+  await action(page, 'Resend').click()
+  await expectPlain(toasts, 'The email did not go out. Try again, or download the PDF and send it yourself.')
+  await expect(page.getByText(/resend\.com|gmail\.com/)).toHaveCount(0)
+  answer = { status: 401, json: { error: 'invalid_token' } }
+  await action(page, 'Resend').click()
+  await expectPlain(toasts, 'Your sign in ran out. Sign in again, then try again.')
+})
+
+// raw-errors-13: the job's money view told the owner to add Resend keys in
+// Netlify.
+test("Email on the job's money view with no email sender says what to do", async ({ page, context }) => {
+  await installShedInvoice(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/qa-invoice.pdf' } }))
+  await context.route('**/api/send-invoice', (route) => route.fulfill({ status: 503, json: { error: 'sender_not_configured', message: 'Email sender is not configured yet.' } }))
+  await page.goto('/jobs/c-job1?tab=financials', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  const email = page.getByRole('button', { name: 'Email', exact: true })
+  await expect(email).toBeVisible({ timeout: 30_000 })
+  await email.click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'Downloaded the PDF so you can email it manually.')
+})
+
+// raw-errors-6: Void refused by the database showed the policy's words.
+test('a refused Void says so in plain words', async ({ page, context }) => {
+  await installShedInvoice(context)
+  await failRest(context, 'fh_invoices', 'PATCH', FAIL.rls('fh_invoices'))
+  await openInvoice(page, 'inv-1')
+  await page.getByRole('button', { name: /^void$/i }).click()
+  await page.waitForTimeout(700)
+  await page.getByRole('button', { name: /tap again/i }).click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'Your role does not allow this. Ask an owner or admin.')
+})
+
+// raw-errors-4: a payment on no signal said "TypeError: Failed to fetch",
+// and after the sign in ran out it said "JWT expired".
+test('a payment on the invoice with no signal or a lapsed sign in says so in plain words', async ({ page, context }) => {
+  await installShedInvoice(context)
+  let answer: 'drop' | 'jwt' = 'drop'
+  await context.route((url) => url.pathname === '/rest/v1/fh_payments', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return answer === 'drop' ? route.abort('failed') : route.fulfill(FAIL.jwt())
+  })
+  await page.goto('/invoices/inv-1/payment', { waitUntil: 'domcontentloaded' })
+  const amount = page.getByLabel('Amount')
+  await expect(amount).toBeVisible({ timeout: 30_000 })
+  await amount.fill('500')
+  const toasts = page.locator('[data-sonner-toaster]')
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expectPlain(toasts, 'No signal right now. Your work is still here, so try again when the signal is back.')
+  answer = 'jwt'
+  await page.getByRole('button', { name: /^record/i }).click()
+  await expectPlain(toasts, 'Your sign in ran out. Sign in again, then try again.')
 })
 
 test("emailing a draw from the job's invoices goes to the client's current email", async ({ page, context }) => {

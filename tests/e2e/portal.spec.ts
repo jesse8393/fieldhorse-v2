@@ -465,6 +465,23 @@ test('Back from the question form never approves, even with the approval filled 
   expect(spies.requestChanges).toHaveLength(0)
 })
 
+// raw-errors-8: on a weak signal the homeowner was told "Failed to fetch".
+test('approving or asking on a weak signal tells the homeowner in plain words', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload())
+  await context.route('**/api/public-link-approve', (route) => route.abort('failed'))
+  await context.route('**/api/public-link-request-changes', (route) => route.abort('failed'))
+  await openPortal(page)
+  await fillApproval(page)
+  await page.getByRole('button', { name: 'Approve this quote' }).click()
+  const alert = page.getByRole('alert')
+  await expect(alert).toHaveText('We could not reach Parker Construction just now. Check your connection and tap Approve this quote again. Nothing was approved yet.')
+
+  await page.getByRole('button', { name: 'Ask Parker a question first' }).click()
+  await page.getByLabel('Changes needed').fill('Please move the pour to Friday.')
+  await page.getByRole('button', { name: 'Send request' }).click()
+  await expect(alert).toHaveText('We could not reach Parker Construction just now. Check your connection and tap Send request again. Your request was not sent yet.')
+})
+
 test('what happens next is three numbered steps', async ({ page, context }) => {
   await mockPortal(context, proposalPayload())
   await openPortal(page)

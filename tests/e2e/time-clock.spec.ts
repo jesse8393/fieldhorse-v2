@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { nothingRunsOffTheSide } from './helpers/overflow.ts'
+import { expectPlain } from './helpers/rawErrors.ts'
 
 // The job page's time clock (TimeClockCard) when the shift it shows was
 // ended somewhere else first. Clock out never moves an ended shift's end
@@ -146,6 +147,21 @@ test('a failed clock in on Crew home says so in plain words', async ({ context, 
   await expect(toaster).toContainText('Clock in failed')
   await expect(toaster).toContainText('Check your connection and try again.')
   await expect(toaster).not.toContainText('row-level security')
+})
+
+// raw-errors-11: Crew home said a failed clock in plainly, but the job
+// page's clock still showed "TypeError: Failed to fetch".
+test('a failed clock in on the job page says so in plain words', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_contacts: [job('qa-user-1')], fh_time_punches: [] } })
+  await context.route((url) => url.pathname === '/rest/v1/fh_time_punches', (route) => route.request().method() === 'POST' ? route.abort('failed') : route.fallback())
+  await page.goto('/jobs/c-job1', { waitUntil: 'domcontentloaded', timeout: 20_000 })
+  await page.getByRole('button', { name: 'More about this job' }).click()
+  const clockIn = page.getByRole('button', { name: /^Clock in/ })
+  await expect(clockIn).toBeVisible({ timeout: 15_000 })
+  await clockIn.click()
+  const toaster = page.locator('[data-sonner-toaster]')
+  await expectPlain(toaster, "Couldn't clock in")
+  await expectPlain(toaster, 'No signal right now. Try again when the signal is back.')
 })
 
 // OPS-22: Log time and Keep running were 36 pixels high.

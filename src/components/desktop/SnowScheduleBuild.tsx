@@ -76,6 +76,7 @@ import {
 } from '../../lib/scheduleBoard.ts'
 import { SCHEDULE_WEEK_START, startOfWeek } from '../../lib/scheduleDates.ts'
 import { createScheduleEvent, deleteScheduleEvent } from '../../lib/scheduleWrite.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type EventRow = BoardEvent
 
@@ -368,7 +369,7 @@ export default function SnowScheduleBuild(props: Props) {
         ...range
       })
     } catch (e) {
-      result = { error: (e as { message?: string })?.message || 'Try again.' }
+      result = { error: plainError(e, 'The visit was not booked. Try again.') }
     }
     if ('error' in result) {
       queryClient.setQueryData<BookedVisit[]>(bookedCacheKey, removeBookedJob(job.id))

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
+import { expectPlain } from './helpers/rawErrors.ts'
 
 test('manual writing works before AI and a failed replacement keeps the whole draft', async ({ context, page }) => {
   await signIn(context)
@@ -50,6 +51,26 @@ test('failed team setup stays distinct from an empty roster and retry recovers',
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByText('Workspace owner', { exact: false })).toBeVisible()
   await expect(page.getByText('Active members · 1', { exact: true })).toBeVisible()
+})
+
+// raw-errors-9: a refused rate showed the code invalid_rate and dropped the
+// sentence the server sent with it.
+test('a refused team rate shows the server\'s plain sentence, never its code', async ({ context, page }) => {
+  await signIn(context)
+  await page.route('**/api/org-members-list', (route) => route.fulfill({ json: {
+    ok: true, org_id: 'org-1', caller_role: 'owner', invites: [], invites_available: true,
+    members: [
+      { id: 'm1', user_id: 'qa-user-1', role: 'owner', email: 'qa@fieldhorse.local', name: 'Jesse Parker', joined_at: '2026-08-01T15:00:00Z', is_self: true },
+      { id: 'm2', user_id: 'crew-2', role: 'crew', email: 'dale@parker.co', name: 'Dale Ruiz', joined_at: '2026-09-01T15:00:00Z', is_self: false, default_hourly_rate: 28 }
+    ]
+  } }))
+  await page.route('**/api/org-member-rate', (route) => route.fulfill({ status: 400, json: { error: 'invalid_rate', message: 'Rate must be between 0 and 10000.' } }))
+  await page.goto('/team')
+  const rate = page.getByLabel('Hourly rate for Dale Ruiz')
+  await expect(rate).toBeVisible({ timeout: 30_000 })
+  await rate.fill('12000')
+  await rate.blur()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'Rate must be between 0 and 10000.')
 })
 
 test('empty inbox gives a useful next step and does not ask for an absent conversation', async ({ context, page }) => {

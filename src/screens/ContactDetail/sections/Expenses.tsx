@@ -11,6 +11,7 @@ import { todayYmd } from '../../../lib/dates.ts'
 import { Button, Field } from '../../../components/fh'
 import { Choices, moneyInput } from '../../../screens/new/CreateShell.tsx'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const EXPENSE_CATEGORIES = [
   { value: 'Materials', label: 'Materials' },
@@ -72,7 +73,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       expense_date: form.expense_date
     })
     if (error) {
-      toastError("Couldn't add expense", error.message)
+      toastError("Couldn't add expense", plainError(error, 'Try again.'))
       setSaving(false)
       return
     }
@@ -88,7 +89,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
     // By id, with the row asked back: an expense a teammate logged carries
     // their id, so a user filter matched nothing and still said removed.
     const { data: removed, error } = await supabase.from('fh_expenses').delete().eq('id', id).eq('contact_id', contact.id).select('id')
-    if (error) { toastError("Couldn't delete", error.message); return }
+    if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); return }
     if (!removed?.length) {
       toastError("Couldn't delete", 'This expense was not removed. It may be gone already, or you may not have access to it.')
       fetchAll?.()
@@ -103,7 +104,7 @@ export default function ExpensesSection({ contact, expenses = [], userId, fetchA
       onUndo: async () => {
         if (!snapshot) return
         const { error: insErr } = await supabase.from('fh_expenses').insert(snapshot)
-        if (insErr) { toastError("Couldn't undo", insErr.message); return }
+        if (insErr) { toastError("Couldn't undo", plainError(insErr, 'Try again.')); return }
         await recalcCost(contact.id, userId)
         fetchAll?.()
         toastSuccess('Restored', snapshot.description || '')

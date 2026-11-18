@@ -21,6 +21,7 @@ import { hapticError, hapticSuccess } from '../../lib/haptics.ts'
 import { todayYmd } from '../../lib/dates.ts'
 import { useSecondTap } from '../../lib/secondTap.ts'
 import { JobScreenFallback, money, useJobScreen } from './jobScreen.tsx'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // The pdf chunk is large and only needed for a certificate.
 async function loadPdf(): Promise<any> {
@@ -109,7 +110,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       goBack()
     } catch (e) {
       hapticError()
-      const message = (e as { message?: string })?.message || 'Unknown error'
+      const message = plainError(e, 'The closeout was not saved. Try again.', { kept: true })
       setError(message)
       toastError("Couldn't save closeout", message)
       setSaving(false)
@@ -131,7 +132,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
           goBack()
         } catch (e) {
           hapticError()
-          toastError("Couldn't reopen", (e as { message?: string })?.message || 'Unknown error')
+          toastError("Couldn't reopen", plainError(e, 'Try again.'))
           setBusy(false)
         }
       })()
@@ -164,7 +165,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       toastSuccess('Certificate ready', result.filename)
     } catch (e) {
       hapticError()
-      toastError("Couldn't build certificate", (e as { message?: string })?.message || 'Unknown error')
+      toastError("Couldn't build certificate", plainError(e, 'Try again.'))
     } finally {
       setBusy(false)
     }
@@ -188,7 +189,7 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
       const rowId = createUuid()
       const path = `${userId}/${contact.id}/${rowId}.pdf`
       const { error: upErr } = await supabase.storage.from('job-files').upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the certificate PDF: ${upErr.message}`)
+      if (upErr) throw new Error(plainError(upErr, 'The certificate PDF could not be saved, so nothing was sent. Try again.'))
       try {
         await supabase.from('fh_job_files').insert({
           id: rowId, user_id: userId, job_id: contact.id, filename: result.filename,
@@ -209,12 +210,12 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
         downloadPdf(result)
         return
       }
-      if (!sendRes.ok || !sendBody?.ok) throw new Error(sendBody?.detail || sendBody?.error || 'The email did not go out.')
+      if (!sendRes.ok || !sendBody?.ok) throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The certificate was not sent. Try again.'))
       hapticSuccess()
       toastSuccess(`Certificate sent to ${recipient}`, result.filename)
     } catch (e) {
       hapticError()
-      toastError("Couldn't send certificate", (e as { message?: string })?.message || 'Unknown error')
+      toastError("Couldn't send certificate", plainError(e, 'The certificate was not sent. Try again.'))
     } finally {
       setBusy(false)
     }

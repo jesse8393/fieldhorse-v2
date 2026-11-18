@@ -21,6 +21,7 @@ import { invalidateAfterQuoteWrite } from '../../lib/quotes.ts'
 import { quoteKey } from '../../lib/queries.ts'
 import { QUOTE_SELECT, type QuoteWithClient } from './quoteShape.ts'
 import type { Database } from '../../lib/database.types.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type QuoteUpdate = Database['public']['Tables']['fh_quotes']['Update']
 
@@ -78,11 +79,11 @@ export function useQuote(id: string | undefined) {
     const { data, error } = await supabase.from('fh_quotes').update(updates).eq('id', id).select('id')
     // A write that matched no row saved nothing: the quote was deleted or
     // changed elsewhere, so it is never reported as saved.
-    const message = error ? error.message : !data || data.length === 0 ? 'This quote changed on another device. Check it and try again.' : null
+    const message = error ? plainError(error, 'The change was not saved. Try again.') : !data || data.length === 0 ? 'This quote changed on another device. Check it and try again.' : null
     if (message) {
       if (before) queryClient.setQueryData<QuoteWithClient | null>(key, (current) => (current ? before : current))
       toastError("Couldn't save the quote", message)
-      return { error: { message } }
+      return { error: new Error(message) }
     }
     invalidateAfterQuoteWrite(queryClient, { quoteId: id, leadId: before?.lead_id, clientId: before?.client_id })
     return { error: null }

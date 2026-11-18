@@ -25,6 +25,7 @@ import { EmptyState } from '../ui/index.ts'
 import { parseDateOnly } from '../lib/dates.ts'
 import { useArmedId } from '../lib/secondTap.ts'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // SubDetail, vendor profile surface at /subs/:key.
 //
@@ -116,7 +117,7 @@ export default function SubDetail() {
   const subRows = useMemo(() => bundle?.subRows ?? [], [bundle?.subRows])
   const contacts = bundle?.contacts ?? {}
   const profile = bundle?.profile ?? null
-  const error = isError ? (queryError?.message || 'Could not load sub') : ''
+  const error = isError ? plainError(queryError, 'Could not load this sub. Check your connection and try again.') : ''
   const [creating, setCreating] = useState(false)
 
   // Profile create / edit writes straight to the cached bundle so the
@@ -165,7 +166,7 @@ export default function SubDetail() {
       .maybeSingle()
     setCreating(false)
     if (insErr) {
-      toastError("Couldn't create profile", insErr.message)
+      toastError("Couldn't create profile", plainError(insErr, 'Try again.'))
       return
     }
     hapticSuccess()
@@ -851,7 +852,7 @@ function ProfileEditor({ profile, onSaved }: any) {
       .maybeSingle()
     setSaving(false)
     if (error) {
-      toastError("Couldn't save", error.message)
+      toastError("Couldn't save", plainError(error, 'Try again.'))
       return
     }
     hapticSuccess()
@@ -1036,7 +1037,7 @@ function DocumentsSection({ profile, onChanged }: any) {
       toastSuccess('Uploaded', `${DOC_SLOTS.find((s) => s.id === slotId)?.label || slotId} on file`)
       hapticSuccess()
     } catch (e: any) {
-      toastError("Couldn't upload", e?.message || 'Try again')
+      toastError("Couldn't upload", plainError(e, 'Try again.'))
     } finally {
       setBusySlot(null)
     }
@@ -1065,7 +1066,7 @@ function DocumentsSection({ profile, onChanged }: any) {
       onChanged?.(data)
       toastSuccess('Removed', `${label} cleared`)
     } catch (e: any) {
-      toastError("Couldn't remove", e?.message || 'Try again')
+      toastError("Couldn't remove", plainError(e, 'Try again.'))
     } finally {
       setBusySlot(null)
     }
@@ -1077,7 +1078,7 @@ function DocumentsSection({ profile, onChanged }: any) {
       .from('sub-docs')
       .createSignedUrl(currentPath, 60)
     if (error || !data?.signedUrl) {
-      toastError("Couldn't open file", error?.message || 'Try again')
+      toastError("Couldn't open file", plainError(error, 'Try again.'))
       return
     }
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer')

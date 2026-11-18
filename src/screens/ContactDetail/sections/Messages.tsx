@@ -8,6 +8,7 @@ import { hapticTap } from '../../../lib/haptics.ts'
 import { canHover } from '../../../lib/hover.ts'
 import { PostedByChip, Eyebrow } from '../../../components/v3'
 import { useArmedId } from '../../../lib/secondTap.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 /**
  * Messages section, communication log (fh_notes) tied to this job.
@@ -36,7 +37,7 @@ export default function MessagesSection({ contactId, userId, notes = [], fetchAl
     })
     setSaving(false)
     if (error) {
-      toastError("Couldn't add note", error.message)
+      toastError("Couldn't add note", plainError(error, 'Try again.'))
       return
     }
     if (queued) toastSuccess('Saved offline', 'Will sync when signal returns')

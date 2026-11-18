@@ -21,6 +21,7 @@ import { reviewInvoice } from '../../lib/invoiceReview.js'
 import { JOB_STAGES } from '../../lib/stages.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Job = { id: string; job_title: string | null; name: string | null; amount: number | null; client_id: string | null; stage: string | null }
 
@@ -178,7 +179,7 @@ export default function InvoiceNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      setErrors({ save: e instanceof Error && e.message ? e.message : 'Could not save this invoice. Check your connection and try again.' })
+      setErrors({ save: plainError(e, 'Could not save this invoice. Try again.', { kept: true, lead: true }) })
     }
   }
 

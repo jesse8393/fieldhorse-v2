@@ -112,18 +112,18 @@ export default async (request) => {
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return json({ error: 'missing_api_key', message: 'ANTHROPIC_API_KEY is not set on the server' }, 500)
+    return json({ error: 'missing_api_key', message: 'The assistant is not available right now. Try again later.' }, 500)
   }
 
   const { url: SUPABASE_URL, secretKey: SERVICE_KEY, publicKey: ANON_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    return json({ error: 'server_misconfigured', message: 'Server is missing Supabase credentials.' }, 500)
+    return json({ error: 'server_misconfigured', message: 'The assistant is not available right now. Try again later.' }, 500)
   }
 
   const authHeader = request.headers.get('authorization') || ''
   const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
   if (!accessToken) {
-    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+    return json({ error: 'missing_token', detail: 'Sign in again, then try again.' }, 401)
   }
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }
@@ -259,7 +259,8 @@ export default async (request) => {
       }
     })
   } catch (err) {
-    return json({ error: 'upstream_failed', message: err.message || 'fetch failed' }, 502)
+    console.error('[claude] upstream failed', err)
+    return json({ error: 'upstream_failed', message: 'The assistant could not be reached. Try again in a minute.' }, 502)
   }
 }
 

@@ -16,6 +16,7 @@ import { mintPublicLink } from '../../lib/publicLink.ts'
 import { quoteFollowUpDate } from '../../lib/quoteFollowUp.ts'
 import { loadProjectPhotosForPdf } from '../ContactDetail/sections/DocumentPreviewPane.tsx'
 import { quoteAsContact, type QuoteWithClient } from './quoteShape.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // Lazy, pdf.js plus jspdf and autoTable are large. Only loads on a tap.
 async function loadPdf(): Promise<any> {
@@ -133,7 +134,7 @@ async function uploadQuotePdf(quote: QuoteWithClient, userId: string, result: an
   const { error: upErr } = await supabase.storage
     .from('job-files')
     .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-  if (upErr) throw new Error(`Couldn't save the proposal PDF: ${upErr.message}`)
+  if (upErr) throw new Error(plainError(upErr, 'The proposal PDF could not be saved, so nothing was sent. Try again.'))
   if (quote.job_id) {
     const { error: insErr } = await supabase.from('fh_job_files').insert({
       id: rowId,
@@ -174,7 +175,7 @@ export async function sendQuoteByEmail(input: BuildInput & { preferences: unknow
   })
   const body = await res.json().catch(() => ({}))
   if (res.status === 503 && body?.error === 'sender_not_configured') return { kind: 'sender_not_configured', result }
-  if (!res.ok || !body?.ok) throw new Error(body?.detail || body?.error || 'Email send failed.')
+  if (!res.ok || !body?.ok) throw new Error(plainError({ ...body, status: res.status }, 'The proposal was not sent. Try again.'))
   return { kind: 'sent' }
 }
 
@@ -198,7 +199,7 @@ export async function sendQuoteForSignature(input: BuildInput): Promise<'sent' |
   })
   const data = await res.json().catch(() => ({}))
   if (res.status === 503 && data?.error === 'esign_not_configured') return 'esign_not_configured'
-  if (!res.ok || !data?.ok) throw new Error(data?.detail || data?.error || 'DocuSign send failed.')
+  if (!res.ok || !data?.ok) throw new Error(plainError({ ...data, status: res.status }, 'The signing request was not sent. Try again.'))
   return 'sent'
 }
 

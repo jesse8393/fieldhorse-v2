@@ -38,7 +38,7 @@ export default async (request) => {
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return json({
       error: 'server_misconfigured',
-      message: 'Server is missing Supabase credentials.'
+      message: 'Email sending is not available right now. Try again later.'
     }, 500)
   }
   if (!RESEND_API_KEY || !SEND_EMAIL_FROM) {
@@ -54,7 +54,7 @@ export default async (request) => {
   const authHeader = request.headers.get('authorization') || ''
   const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
   if (!accessToken) {
-    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+    return json({ error: 'missing_token', detail: 'Sign in again, then try again.' }, 401)
   }
 
   let body

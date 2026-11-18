@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase.ts'
 import { useInvalidateSubs } from '../lib/queries.ts'
 import { toastError, toastSuccess } from '../lib/toast.ts'
 import { hapticSuccess } from '../lib/haptics.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 export default function SubNew() {
   const { user } = useAuth()
@@ -51,8 +52,8 @@ export default function SubNew() {
     })
     if (err) {
       setSaving(false)
-      setError(err.message || 'The sub was not saved.')
-      toastError("Couldn't add sub", err.message)
+      setError(plainError(err, 'The sub was not saved. Try again.', { kept: true }))
+      toastError("Couldn't add sub", plainError(err, 'Try again.'))
       return
     }
     hapticSuccess()

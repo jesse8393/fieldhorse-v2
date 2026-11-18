@@ -64,13 +64,13 @@ export async function sendViaResend({ apiKey, payload, key, timeoutMs = PROVIDER
   }
 }
 
-// The handler's error body for a send that did not go out.
-export function sendFailure(result) {
-  return {
-    error: 'send_failed',
-    provider_status: result.status || null,
-    detail: result.detail || result.body?.message || result.body?.error || 'Email provider rejected the send.'
-  }
+// The handler's error body for a send that did not go out. The provider's
+// status and words go to the function log for us; the person reads a plain
+// sentence, since the phone app shows detail as it is.
+export const SEND_FAILED_DETAIL = 'The email did not go out. Try again, or download the PDF and send it yourself.'
+export function sendFailure(result, detail = SEND_FAILED_DETAIL) {
+  console.error('[email] send failed', { status: result.status || null, body: result.body, detail: result.detail || null })
+  return { error: 'send_failed', detail }
 }
 
 // RFC 5322 From header with the display name as a quoted string. Company

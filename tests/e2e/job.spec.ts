@@ -6,6 +6,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
+import { FAIL, expectPlain } from './helpers/rawErrors.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -736,6 +737,40 @@ test('Log payment shows cents and one toast', async ({ context, page }) => {
   await expect(page.getByText(/\$1,234\.50/).first()).toBeVisible()
   await expect(page.getByText(/\$1,235\b/)).toHaveCount(0)
   await expect(page.locator('[data-sonner-toast]').filter({ hasText: /payment/i })).toHaveCount(1)
+})
+
+// raw-errors-4: a gateway's 502 page showed as HTML twice, on the line and
+// in a toast, and a refusal showed the constraint's name.
+test('a failed payment on the job says what to do once, in plain words', async ({ context, page }) => {
+  await signIn(context)
+  let answer: 'gateway' | 'refuse' = 'gateway'
+  await context.route((url) => url.pathname === '/rest/v1/fh_payments', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    return route.fulfill(answer === 'gateway' ? FAIL.gateway() : FAIL.check('fh_payments', 'fh_payments_kind_check'))
+  })
+  await page.goto('/jobs/c-job2/payment', { waitUntil: 'domcontentloaded' })
+  const amount = page.getByLabel('Amount')
+  await expect(amount).toBeVisible({ timeout: 30_000 })
+  await amount.fill('500')
+  await page.getByRole('button', { name: /^Record/ }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'The payment was not recorded. Something went wrong on our side. Try again in a minute.')
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: "Couldn't record payment" })).toHaveCount(0)
+  answer = 'refuse'
+  await page.getByRole('button', { name: /^Record/ }).click()
+  await expectPlain(page.locator('.fhnew-error'), 'The payment was not recorded. Check the amount and kind, then try again.')
+  await expect(amount).toHaveValue('500')
+})
+
+// raw-errors-6: Delete job on no signal said "TypeError: Failed to fetch".
+test('Delete job on no signal says so in plain words and keeps the job', async ({ context, page }) => {
+  await signIn(context)
+  await context.route((url) => url.pathname === '/rest/v1/fh_contacts', (route) => route.request().method() === 'DELETE' ? route.abort('failed') : route.fallback())
+  await page.goto('/jobs/c-job1/more', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: 'Delete job' }).click()
+  await page.waitForTimeout(600)
+  await page.getByRole('button', { name: 'Tap again to delete' }).click()
+  await expectPlain(page.locator('[data-sonner-toaster]'), 'No signal right now. Try again when the signal is back.')
+  await expect(page).toHaveURL(/\/jobs\/c-job1\/more$/)
 })
 
 // M-15: the job page measures margin and health against the contract

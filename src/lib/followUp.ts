@@ -7,6 +7,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase.ts'
 import { jobsKey } from './queries.ts'
 import { toastError, toastSuccess } from './toast.ts'
+import { plainError } from './serviceErrors.ts'
 
 export type FollowUpWhen = number | Date | null
 
@@ -85,10 +86,10 @@ export async function saveFollowUp(
     .update({ follow_up_on: value })
     .eq('id', job.id)
     .select('id')
-  const failure = error || (!data || data.length === 0 ? { message: 'This job may have been removed, or you no longer have access to edit it.' } : null)
+  const failure = error || (!data || data.length === 0 ? new Error('This job may have been removed, or you no longer have access to edit it.') : null)
   if (failure) {
     patchCaches(queryClient, job.id, userId, before)
-    toastError("Couldn't set follow up", failure.message || 'Try again')
+    toastError("Couldn't set follow up", plainError(failure, 'Try again.'))
   } else {
     // Said once the write worked, never beside a failure (OPS-21).
     toastSuccess(

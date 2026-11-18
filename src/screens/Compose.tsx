@@ -18,7 +18,7 @@ import { hapticMedium, hapticSuccess } from '../lib/haptics.ts'
 import { useFhMotion } from '../lib/motion.ts'
 import { FilterPill, Eyebrow } from '../components/v3'
 import { countNoun } from '../lib/format.ts'
-import { aiDraftError } from '../lib/serviceErrors.ts'
+import { aiDraftError, plainError } from '../lib/serviceErrors.ts'
 
 const CHANNELS = [
   { id: 'sms', label: 'SMS', tone: 'Keep it under 160 chars. Tight. No emoji. Punctuation minimal.', Icon: MessageSquare },
@@ -254,7 +254,7 @@ export default function Compose() {
     } catch (e: any) {
       // Sending is a separate action from drafting; report its failure
       // without replacing the message or the drafting status.
-      toastError("Couldn't send the email", e?.message || 'Try again in a moment.')
+      toastError("Couldn't send the email", plainError(e, 'Try again in a moment.'))
     } finally {
       sendLock.current = false
       setSending(false)

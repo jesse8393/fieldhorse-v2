@@ -22,6 +22,7 @@ import { compressImageToBlob } from '../../../lib/docIntelligence.ts'
 import { todayYmd } from '../../../lib/dates.ts'
 import { Eyebrow } from '../../../components/v3'
 import Field from '../../../components/fh/Field.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const SkeletonAny = SkeletonList as any
 const PHOTO_BUCKET = 'job-photos'
@@ -117,7 +118,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       .order('created_at', { ascending: false })
       .limit(50)
     if (error) {
-      toastError("Couldn't load daily logs", error.message)
+      toastError("Couldn't load daily logs", plainError(error, 'Try again.'))
       setRows([])
     } else {
       const list = (data || []) as LogRow[]
@@ -212,7 +213,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     try {
       blob = await compressImageToBlob(file, 1_500_000, 1800)
     } catch (ex: any) {
-      toastError("Couldn't process photo", ex?.message || file.name)
+      toastError("Couldn't process photo", plainError(ex, `${file.name} could not be read. Try another photo.`))
       return null
     }
     if (!blob) return null
@@ -224,7 +225,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       .from(PHOTO_BUCKET)
       .upload(path, blob, { upsert: false, contentType: 'image/jpeg' })
     if (upErr) {
-      toastError('Upload failed', upErr.message)
+      toastError('Upload failed', plainError(upErr, 'Try again.'))
       return null
     }
     const previewUrl = URL.createObjectURL(blob)
@@ -314,7 +315,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
         .select('id')
       setSaving(false)
       if (error || !updated?.length) {
-        toastError("Couldn't save changes", error?.message || 'This log may have been deleted, or you can no longer edit it.')
+        toastError("Couldn't save changes", plainError(error, 'This log may have been deleted, or you can no longer edit it.'))
         return
       }
       // Photos taken off the log in this edit are no longer referenced.
@@ -344,7 +345,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
     const { error } = await supabase.from('fh_daily_logs').insert(payload as any)
     setSaving(false)
     if (error) {
-      toastError("Couldn't post log", error.message)
+      toastError("Couldn't post log", plainError(error, 'Try again.'))
       return
     }
     clearDraft()
@@ -364,7 +365,7 @@ export default function DailyLogsSection({ jobId, userId }: any) {
       .eq('user_id', userId)
       .select('id')
     if (error || !deleted?.length) {
-      toastError("Couldn't delete", error?.message || 'This log may already be gone, or you can no longer delete it.')
+      toastError("Couldn't delete", plainError(error, 'This log may already be gone, or you can no longer delete it.'))
       load()
       return
     }

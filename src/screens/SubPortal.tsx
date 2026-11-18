@@ -33,6 +33,7 @@ import MiniMetric from '../components/MiniMetric.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
 import { Eyebrow } from '../components/v3'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // Toast words for each document kind; acronyms stay in capitals.
 const DOC_KIND_LABEL: Record<DocKind, string> = { coi: 'COI', w9: 'W9', license: 'License' }
@@ -98,15 +99,12 @@ export default function SubPortal() {
       const res = await subPortalContext()
       setCtx(res)
     } catch (e: any) {
-      const raw = e?.detail || e?.message || ''
-      // Raw server codes ("http_404") read as gibberish. A 404 here just
-      // means no partner records exist for this account yet.
+      // A 404 here just means no partner records exist for this account
+      // yet; anything else is worded by plainError.
       setError(
-        /^http_404$/i.test(raw)
+        Number(e?.status) === 404
           ? 'No partner records yet. When a contractor adds you to a job, it shows up here.'
-          : /^http_\d+$/i.test(raw)
-            ? 'Could not load portal data. Check your connection and retry.'
-            : raw || 'Could not load portal data.'
+          : plainError(e, 'Could not load portal data. Check your connection and retry.')
       )
     } finally {
       setLoading(false)
@@ -141,7 +139,7 @@ export default function SubPortal() {
       toastSuccess(`${DOC_KIND_LABEL[kind]} uploaded`)
       await load()
     } catch (e: any) {
-      toastError('Upload failed', e?.detail || e?.message || '')
+      toastError('Upload failed', plainError(e, 'Try again.'))
     } finally {
       setUploading(null)
     }

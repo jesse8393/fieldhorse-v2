@@ -77,7 +77,7 @@ export default async (request) => {
 
   const { url: SUPABASE_URL, secretKey: SERVICE_KEY } = supabaseServiceConfig()
   if (!SUPABASE_URL || !SERVICE_KEY) {
-    return json({ error: 'server_misconfigured', message: 'Missing Supabase credentials.' }, 500)
+    return json({ error: 'server_misconfigured', message: 'E-signature is not available right now. Send the quote link instead.' }, 500)
   }
 
   const cfg = {
@@ -91,7 +91,7 @@ export default async (request) => {
   if (!cfg.integrationKey || !cfg.userId || !cfg.accountId || !cfg.privateKey) {
     return json({
       error: 'esign_not_configured',
-      message: 'DocuSign is not connected yet. Add the DOCUSIGN_* env vars in Netlify.'
+      message: 'E-signature is not set up for this company yet. Send the quote link instead.'
     }, 503)
   }
 
@@ -101,7 +101,7 @@ export default async (request) => {
   const authHeader = request.headers.get('authorization') || ''
   const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
   if (!accessToken) {
-    return json({ error: 'missing_token', detail: 'Authorization: Bearer <access_token> is required.' }, 401)
+    return json({ error: 'missing_token', detail: 'Sign in again, then try again.' }, 401)
   }
 
   let body

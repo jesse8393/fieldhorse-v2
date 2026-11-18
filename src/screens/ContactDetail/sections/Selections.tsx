@@ -25,6 +25,7 @@ import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
 import Field from '../../../components/fh/Field.tsx'
 import { moneyExact } from '../../../lib/format.ts'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const SkeletonAny = SkeletonList as any
 
@@ -115,7 +116,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
       .order('created_at', { ascending: false })
       .limit(100)
     if (error) {
-      toastError("Couldn't load selections", error.message)
+      toastError("Couldn't load selections", plainError(error, 'Try again.'))
       setRows([])
     } else {
       setRows(((data || []) as any[]).map((r) => ({
@@ -142,7 +143,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
     }
     if (clientId) payload.client_id = clientId
     const { error } = await supabase.from('fh_selections').insert(payload)
-    if (error) { toastError("Couldn't create selection", error.message); return }
+    if (error) { toastError("Couldn't create selection", plainError(error, 'Try again.')); return }
     toastSuccess('Selection created')
     setComposing(false)
     load()
@@ -153,7 +154,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
     setRows((rs) => rs.map((r) => r.id === id ? { ...r, ...(patch as any) } : r))
     const { data, error } = await supabase.from('fh_selections').update(patch as any).eq('id', id).select('id').single()
     if (error || !data) {
-      toastError("Couldn't update", error?.message || 'No selection was updated. Try again.')
+      toastError("Couldn't update", plainError(error, 'No selection was updated. Try again.'))
       setRows(before)
       return false
     }
@@ -179,7 +180,7 @@ export default function SelectionsSection({ jobId, userId, clientId }: any) {
     hapticTap()
     setRows((rs) => rs.filter((r) => r.id !== id))
     const { error } = await supabase.from('fh_selections').delete().eq('id', id)
-    if (error) { toastError("Couldn't delete", error.message); load() }
+    if (error) { toastError("Couldn't delete", plainError(error, 'Try again.')); load() }
   }
 
   // Status counts for the small summary chip.

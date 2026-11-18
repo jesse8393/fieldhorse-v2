@@ -36,6 +36,7 @@ import { useMediaQuery } from '../../lib/useMediaQuery.ts'
 import { useFhMotion } from '../../lib/motion.ts'
 import { Eyebrow, StampNumber } from '../../components/v3'
 import { InvoiceTemplate } from '../../components/documents'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 /**
  * JobMoney, a job's money, reached at /jobs/:id?tab=financials only (the
@@ -122,7 +123,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   const payments = useMemo(() => bundle?.payments ?? [], [bundle])
   const insurance = bundle?.insurance ?? null
   const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
-  const error = isError ? (queryError?.message || 'Could not load invoice') : ''
+  const error = isError ? plainError(queryError, 'Could not load the invoice. Check your connection and try again.') : ''
 
   // First-class invoice draws (fh_invoices) for this job. fh_contacts has
   // no due_at column, the real issue/due dates, invoice number, and the
@@ -308,7 +309,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       downloadPdf(result)
       toastSuccess('Invoice PDF downloaded', result.filename)
     } catch (e: any) {
-      toastError("Couldn't generate PDF", e?.message || 'Try again')
+      toastError("Couldn't generate PDF", plainError(e, 'Try again.'))
     } finally {
       setGenerating(false)
     }
@@ -343,7 +344,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
         toastSuccess('Share link ready', link.url)
       }
     } catch (e: any) {
-      toastError("Couldn't mint share link", e?.message || 'Try again.')
+      toastError("Couldn't mint share link", plainError(e, 'Try again.'))
     } finally {
       setSharing(false)
     }
@@ -466,7 +467,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       const { error: upErr } = await supabase.storage
         .from('job-files')
         .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the invoice PDF: ${upErr.message}`)
+      if (upErr) throw new Error(plainError(upErr, 'The invoice PDF could not be saved, so nothing was sent. Try again.'))
       // Audit row (best-effort).
       try {
         await supabase.from('fh_job_files').insert({
@@ -503,19 +504,15 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
         toastError(
           "Email not sent, sender isn't configured",
-          'Downloaded the PDF so you can email it manually. To send direct, add Resend keys in Netlify env.'
+          'Downloaded the PDF so you can email it manually.'
         )
         downloadPdf(result)
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        // Surface the actual provider error (Resend message + HTTP status)
-        // so the operator sees exactly why the send failed instead of
-        // hunting through Netlify function logs. Was previously hidden
-        // behind a generic "Email send failed." string.
-        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-        throw new Error(`Resend rejected${status}: ${detail}`)
+        // The provider's words and status go to the log; the owner reads
+        // what did not happen and what to do (raw-errors-7).
+        throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The invoice was not sent. Try again.'))
       }
 
       toastSuccess(`Invoice sent to ${resolved.email}`, result.filename)
@@ -523,7 +520,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
       setTimeout(() => setSent(false), 2400)
       refresh()
     } catch (e: any) {
-      toastError("Couldn't send invoice", e?.message || 'Try again')
+      toastError("Couldn't send invoice", plainError(e, 'The invoice was not sent. Try again.'))
     } finally {
       setSending(false)
     }
@@ -555,7 +552,7 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
     const res = contact ? await deletePayment(contact as any, paymentId) : null
     setDeletingId(null)
     if (!res || res.error) {
-      toastError("Couldn't delete payment", res?.error?.message || 'This job is not loaded yet. Try again.')
+      toastError("Couldn't delete payment", plainError(res?.error, 'This job is not loaded yet. Try again.'))
       refresh()
       return
     }

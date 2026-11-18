@@ -28,6 +28,7 @@ import { updateProfilePreferences } from '../lib/profilePreferences.ts'
 import { changeTemplatePreferences, templatePreferences, type TemplatePreferences } from './estimates/estimateLibrary.ts'
 import QuoteLibrary from './estimates/QuoteLibrary.tsx'
 import DataErrorState from '../components/DataErrorState.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 
 
 // White-label: internal-only tool but no app-attributable phrasing
@@ -88,7 +89,7 @@ export default function Bid() {
       await updateProfilePreferences(user.id, current => changeTemplatePreferences(current, id, patch))
       await refreshProfile()
       toastSuccess('Library updated')
-    } catch (error) { toastError('Could not update library', error instanceof Error ? error.message : 'Try again.') }
+    } catch (error) { toastError('Could not update library', plainError(error, 'Try again.')) }
     finally { setTemplateSaving(null) }
   }
   // Deleting a template takes a second tap on the same button (D57).
@@ -189,7 +190,7 @@ export default function Bid() {
       }
     } catch (e: any) {
       console.error('[bid] generate failed:', e)
-      setErr(e.message || 'Estimate generation failed')
+      setErr(plainError(e, 'The estimate could not be made. Try again.'))
     } finally {
       setGenerating(false)
     }
@@ -295,7 +296,7 @@ export default function Bid() {
       navigate(recordRoute('quote', quote.id))
     } catch (e: any) {
       console.error('[bid] pushToJob failed:', e)
-      toastError("Couldn't create the quote from this bid", e?.message || 'Try again.')
+      toastError("Couldn't create the quote from this bid", plainError(e, 'Try again.'))
     } finally {
       setPushing(false)
     }
@@ -327,7 +328,7 @@ export default function Bid() {
       setTemplateNamePrompt('')
       await fetchTemplates()
     } catch (e: any) {
-      toastError("Couldn't save template", e?.message || 'Try again.')
+      toastError("Couldn't save template", plainError(e, 'Try again.'))
     } finally {
       setSavingTemplate(false)
     }
@@ -362,7 +363,7 @@ export default function Bid() {
       toastSuccess('Template deleted', t.name)
       await fetchTemplates()
     } catch (e: any) {
-      toastError("Couldn't delete", e?.message || 'Try again.')
+      toastError("Couldn't delete", plainError(e, 'Try again.'))
     }
   }
 

@@ -45,6 +45,7 @@ import { assignedCrewIds, railNotes } from './lib/jobDesktop.ts'
 import JobHeaderPhone, { JobSectionTabs } from './phone/JobHeaderPhone.tsx'
 import JobActionCapsule from './phone/JobActionCapsule.tsx'
 import { useJobPhotos } from './phone/SpineList.tsx'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // Tab fallback for Suspense, replaces fallback={null}, which made tab
 // taps look broken (active state animates, then blank space for the
@@ -516,7 +517,7 @@ export default function ContactDetail() {
     if (!contact) return
     const res: any = await reopen(contact)
     if (res?.error) {
-      toastError("Couldn't reopen", res.error.message || 'Try again')
+      toastError("Couldn't reopen", plainError(res.error, 'Try again.'))
       return
     }
     await fetchAll()

@@ -19,6 +19,7 @@ import TopbarWeather from '../components/desktop/TopbarWeather.tsx'
 import { startOfWeek, SCHEDULE_WEEK_START } from '../lib/scheduleDates.ts'
 import { Button } from '../ui/index.ts'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
+import { plainError } from '../lib/serviceErrors.ts'
 
 // HH:MM format, see comment in screens/Crew.tsx. Bebas Neue
 // (the display font on duration metrics) is uppercase-only, so
@@ -152,7 +153,7 @@ export default function Timesheets() {
       setPunches((cur) => cur.filter((p) => !res.approved_ids.includes(p.id)))
       recalcAffected(res.approved_ids || ids)
     } catch (e: any) {
-      toastError('Approve failed', e?.detail || e?.message || '')
+      toastError('Approve failed', plainError(e, 'Try again.'))
     } finally {
       setApproving((m) => {
         const next = { ...m }
@@ -174,7 +175,7 @@ export default function Timesheets() {
       setPunches((cur) => cur.map((p) => p.id === id ? { ...p, flagged: true, flag_reason: reason.trim() || null } : p))
       recalcAffected([id])
     } catch (e: any) {
-      toastError('Flag failed', e?.detail || e?.message || '')
+      toastError('Flag failed', plainError(e, 'Try again.'))
     } finally {
       setApproving((m) => { const n = { ...m }; delete n[id]; return n })
     }
@@ -188,7 +189,7 @@ export default function Timesheets() {
       setPunches((cur) => cur.map((p) => p.id === id ? { ...p, flagged: false, flag_reason: null } : p))
       recalcAffected([id])
     } catch (e: any) {
-      toastError('Failed', e?.detail || e?.message || '')
+      toastError('Failed', plainError(e, 'Try again.'))
     } finally {
       setApproving((m) => { const n = { ...m }; delete n[id]; return n })
     }

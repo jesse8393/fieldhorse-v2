@@ -22,7 +22,7 @@ import MiniMetric from '../components/MiniMetric.tsx'
 import { useSecondTap } from '../lib/secondTap.ts'
 import { Eyebrow } from '../components/v3'
 import PaletteKeyCap, { paletteShortcut } from '../components/desktop/PaletteKeyCap.tsx'
-import { teamLoadError } from '../lib/serviceErrors.ts'
+import { teamLoadError, plainError } from '../lib/serviceErrors.ts'
 
 function fmtJoined(iso: string | null): string {
   if (!iso) return '\u2003'
@@ -250,7 +250,7 @@ export default function Team() {
                               toastSuccess('Invite revoked')
                               load()
                             } catch (e: any) {
-                              toastError('Revoke failed', e?.message || '')
+                              toastError('Revoke failed', plainError(e, 'The invite was not cancelled. Try again.'))
                             }
                           }}
                         >
@@ -322,7 +322,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
       toastSuccess('Rate saved', `${member.name || member.email || 'Member'} · ${next != null ? '$' + next + '/hr' : 'cleared'}`)
       onChanged?.()
     } catch (e: any) {
-      toastError("Couldn't save rate", e?.message || 'Try again')
+      toastError("Couldn't save rate", plainError(e, 'The rate was not saved. Try again.'))
       // The server rejected it (e.g. rate ≥ 10000), snap the field back
       // to the member's real rate so the screen doesn't read as if the
       // rejected value was saved.
@@ -345,7 +345,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
       toastSuccess('Role updated', `${member.name || member.email || 'Member'} → ${next}`)
       onChanged?.()
     } catch (e: any) {
-      toastError("Couldn't change role", e?.message || 'Try again')
+      toastError("Couldn't change role", plainError(e, 'The role was not changed. Try again.'))
     } finally { setBusy(false) }
   }
 
@@ -357,7 +357,7 @@ function MemberActions({ member, callerRole, canManage, onChanged }: any) {
       toastSuccess('Member removed', member.name || member.email || '')
       onChanged?.()
     } catch (e: any) {
-      toastError("Couldn't remove member", e?.message || 'Try again')
+      toastError("Couldn't remove member", plainError(e, 'This person is still on the team. Try again.'))
     } finally { setBusy(false) }
   }
 

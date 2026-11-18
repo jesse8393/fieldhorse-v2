@@ -5,10 +5,7 @@ import { isSupabaseConfigured } from '../lib/supabase.ts'
 import { safeNextPath } from '../lib/nextPath.ts'
 import { Button, Field } from '../components/fh'
 import AuthShell from './auth/AuthShell.tsx'
-
-function getErrorMessage(err: unknown, fallback: string) {
-  return err instanceof Error ? err.message : fallback
-}
+import { plainError } from '../lib/serviceErrors.ts'
 
 const MISSING_ENV = 'Local Supabase env is missing. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local, then restart Vite.'
 
@@ -77,7 +74,7 @@ export default function Login() {
       if (error) throw error
       setNotice('Reset link sent. Check your email.')
     } catch (err) {
-      setError(getErrorMessage(err, 'Could not send reset email.'))
+      setError(plainError(err, 'Could not send the reset email. Try again.'))
     } finally {
       setBusy(false)
     }
@@ -130,7 +127,7 @@ export default function Login() {
       }
     } catch (err) {
       setJustSignedUp(false)
-      setError(getErrorMessage(err, 'Authentication failed'))
+      setError(plainError(err, mode === 'signin' ? 'Could not sign in. Try again.' : 'Could not make your account. Try again.'))
     } finally {
       setBusy(false)
     }

@@ -60,7 +60,7 @@ export function reopenQuestion(_contact: Pick<Contact, 'stage'>) {
 
 export async function reopen(contact: Contact) {
   if (contact.stage !== 'closed' && contact.stage !== 'lost') {
-    return { data: null, error: { message: 'Only closed or lost jobs can be reopened.' } }
+    return { data: null, error: new Error('Only closed or lost jobs can be reopened.') }
   }
   if (contact.stage === 'lost') {
     // Migration 093 moves never-won lost contacts to their lead/quote
@@ -68,8 +68,8 @@ export async function reopen(contact: Contact) {
     // an older unmigrated lead must never become a job merely by reopening.
     const { data: history, error } = await supabase.from('fh_stage_transitions')
       .select('to_stage').eq('contact_id', contact.id).in('to_stage', WON_STAGES).limit(1)
-    if (error) return { data: null, error: { message: 'Could not verify this job’s history. Try again.' } }
-    if (!history?.length) return { data: null, error: { message: 'This record has no previous job. Review its lead or quote before reopening.' } }
+    if (error) return { data: null, error: new Error('Could not verify this job’s history. Try again.') }
+    if (!history?.length) return { data: null, error: new Error('This record has no previous job. Review its lead or quote before reopening.') }
   }
   // Leads and quotes have their own tables. Never write a legacy lead
   // stage that would remove this job from the current work inventory.

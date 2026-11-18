@@ -68,6 +68,7 @@ import { pushOutbox } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
 import { speechErrorFeedback } from '../lib/speech.ts'
 import './capture.css'
+import { plainError } from '../lib/serviceErrors.ts'
 
 type Phase = 'input' | 'parsing' | 'confirm' | 'saving'
 // Where the words came from, for the "Heard" line.
@@ -320,7 +321,7 @@ export default function Capture() {
     } catch (e: any) {
       if (run !== runRef.current) return
       hapticError()
-      toastError("Couldn't read the receipt", e?.message || 'Add it by voice or text instead.')
+      toastError("Couldn't read the receipt", plainError(e, 'Add it by voice or text instead.'))
       setSource('text')
       setPhase('input')
     } finally {
@@ -393,7 +394,7 @@ export default function Capture() {
       void result.link
     } catch (e: any) {
       hapticError()
-      toastError("Couldn't save that", e?.message || 'Try again.')
+      toastError("Couldn't save that", plainError(e, 'Try again.'))
       setPhase('confirm')
     }
   }

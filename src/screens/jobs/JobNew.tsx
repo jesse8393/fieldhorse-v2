@@ -18,6 +18,7 @@ import { createUuid } from '../../lib/uuid.ts'
 import { JOB_TYPES } from '../../lib/jobTypes.ts'
 import { recordRoute } from '../../lib/records.ts'
 import { hapticMedium } from '../../lib/haptics.ts'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 type Form = {
   requestId: string
@@ -105,7 +106,7 @@ export default function JobNew() {
     } catch (e) {
       savingRef.current = false
       setSaving(false)
-      setErrors({ save: e instanceof Error && e.message ? e.message : 'Could not save this job. Check your connection and try again.' })
+      setErrors({ save: plainError(e, 'Could not save this job. Try again.', { kept: true, lead: true }) })
     }
   }
 

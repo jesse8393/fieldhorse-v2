@@ -16,6 +16,7 @@ import { mergedProfile, subPortalContext, subProfileUpdate, type SubProfile, typ
 import { toastSuccess } from '../lib/toast.ts'
 import { hapticMedium } from '../lib/haptics.ts'
 import { keepFocusOnRetry } from '../lib/retryFocus.ts'
+import { plainError } from '../lib/serviceErrors.ts'
 
 const FIELDS: Array<keyof SubProfileUpdate> = [
   'phone', 'address', 'ein', 'insurance_carrier', 'insurance_policy', 'insurance_expires_on', 'license_number', 'payment_handle', 'payment_method'
@@ -53,7 +54,7 @@ export default function SubPortalProfile() {
       })
       .catch((e: any) => {
         if (!alive) return
-        setLoadError(e?.detail || e?.message || 'Could not load your profile.')
+        setLoadError(plainError(e, 'Could not load your profile.'))
       })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
@@ -91,7 +92,7 @@ export default function SubPortalProfile() {
       toastSuccess('Profile updated')
       goBack()
     } catch (e: any) {
-      setError(e?.detail || e?.message || 'Update failed.')
+      setError(plainError(e, 'Your profile was not saved. Try again.', { kept: true }))
       setSaving(false)
     }
   }

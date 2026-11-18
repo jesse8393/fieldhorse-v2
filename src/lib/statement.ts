@@ -33,6 +33,7 @@ import { createUuid } from './uuid.ts'
 const loadPdf = () => import('./pdf.js')
 
 import { amountsDueByInvoice, isOpenInvoice, knownContractTotal, type DueInvoice } from './invoiceSettlement.ts'
+import { plainError } from './serviceErrors.ts'
 
 export type StatementJob = {
   id: string
@@ -294,7 +295,7 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
   if (!recipient) return { ok: false, reason: 'no_email' }
 
   const result = await buildStatementPdf({ company, client, data })
-  if (!result?.doc) return { ok: false, reason: 'error', message: 'PDF generator returned no document' }
+  if (!result?.doc) return { ok: false, reason: 'error', message: 'The statement PDF could not be made. Try again.' }
 
   const { supabase, authHeaders } = await import('./supabase.ts')
   const blob = result.doc.output('blob')
@@ -303,7 +304,7 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
   const { error: upErr } = await supabase.storage
     .from('job-files')
     .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-  if (upErr) return { ok: false, reason: 'error', message: `Couldn't save the statement PDF: ${upErr.message}` }
+  if (upErr) return { ok: false, reason: 'error', message: plainError(upErr, 'The statement PDF could not be saved, so nothing was sent. Try again.') }
 
   const sendRes = await fetch('/api/send-statement', {
     method: 'POST',
@@ -327,7 +328,7 @@ export async function sendStatementEmail({ company, client, data, userId, recipi
     return { ok: false, reason: 'sender_not_configured' }
   }
   if (!sendRes.ok || !body?.ok) {
-    return { ok: false, reason: 'error', message: body?.message || body?.error || 'Send failed' }
+    return { ok: false, reason: 'error', message: plainError({ ...body, status: sendRes.status }, 'The statement was not sent. Try again.') }
   }
   return { ok: true, recipient }
 }

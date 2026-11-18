@@ -23,6 +23,7 @@ import { keepFocusOnRetry } from '../../../lib/retryFocus.ts'
 import { jobPhotosKey } from '../phone/SpineList.tsx'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 const BUCKET = 'job-photos'
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB per photo
@@ -212,7 +213,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
         try {
           uploadBlob = await compressImageToBlob(file, 1_500_000, 1800)
         } catch (ex: any) {
-          toastError("Couldn't process photo", ex?.message || `${file.name} skipped`)
+          toastError("Couldn't process photo", plainError(ex, `${file.name} was skipped. Try another photo.`))
           continue
         }
         const rowId = createUuid()
@@ -290,7 +291,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
         }
       }
     } catch (ex: any) {
-      toastError('Upload failed', ex?.message || 'Try again')
+      toastError('Upload failed', plainError(ex, 'Try again.'))
     } finally {
       setUploading(false)
       setUploadProgress({ current: 0, total: 0 })
@@ -334,7 +335,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       .eq('id', rowId)
       .select('id')
     if (error || !data?.length) {
-      toastError("Couldn't save caption", error?.message || 'This photo may have been deleted.')
+      toastError("Couldn't save caption", plainError(error, 'This photo may have been deleted.'))
       fetchRows()
     }
   }
@@ -353,7 +354,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       .eq('id', rowId)
       .select('id')
     if (error || !data?.length) {
-      toastError("Couldn't save section tag", error?.message || 'This photo may have been deleted.')
+      toastError("Couldn't save section tag", plainError(error, 'This photo may have been deleted.'))
       fetchRows()
     }
   }
@@ -388,7 +389,7 @@ export default function PhotosSection({ jobId, userId, incomingFiles = null, onI
       await fetchRows()
       refreshJobPhotos()
     } catch (ex: any) {
-      toastError('Delete failed', ex?.message || 'Try again')
+      toastError('Delete failed', plainError(ex, 'Try again.'))
     } finally {
       setDeleting(false)
     }

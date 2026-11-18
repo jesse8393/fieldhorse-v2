@@ -22,6 +22,7 @@ import {
 } from '../../lib/rateCard.ts'
 import { Eyebrow } from '../v3'
 import '../../styles/settings.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 function slugify(s: any) {
   return String(s || '')
@@ -118,7 +119,7 @@ export default function RateCardEditor() {
       })
     } catch (err: any) {
       hapticError()
-      toastError("Couldn't save rate", err?.message || 'Unknown error')
+      toastError("Couldn't save rate", plainError(err, 'Try again.'))
       setDraft((dd: any) => ({ ...dd, [row.key]: { ...d, saving: false } }))
     }
   }
@@ -145,7 +146,7 @@ export default function RateCardEditor() {
       })
     } catch (err: any) {
       hapticError()
-      toastError("Couldn't reset", err?.message || 'Unknown error')
+      toastError("Couldn't reset", plainError(err, 'Try again.'))
     }
   }
 
@@ -171,7 +172,7 @@ export default function RateCardEditor() {
       await reload()
     } catch (err: any) {
       hapticError()
-      toastError("Couldn't add trade", err?.message || 'Unknown error')
+      toastError("Couldn't add trade", plainError(err, 'Try again.'))
     }
   }
 

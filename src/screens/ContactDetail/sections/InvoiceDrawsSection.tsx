@@ -49,6 +49,7 @@ import { useMembership } from '../../../contexts/MembershipContext.tsx'
 import { canEditJobMoney } from '../lib/jobAccess.ts'
 import { useMediaQuery } from '../../../lib/useMediaQuery.ts'
 import { moneyInput } from '../../new/CreateShell.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 
 function shortDate(iso: any) {
@@ -121,7 +122,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
     if (!contactId) return
     setLoading(true)
     const { data, error } = await fetchInvoicesForContact(contactId)
-    if (error) toastError("Couldn't load draws", error.message)
+    if (error) toastError("Couldn't load draws", plainError(error, 'Try again.'))
     setDraws(data || [])
     setLoadFailed(!!error)
     setLoading(false)
@@ -189,7 +190,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       await fetchDraws()
       return true
     } catch (e: any) {
-      toastError("Couldn't save draw", e?.message || 'Try again.')
+      toastError("Couldn't save draw", plainError(e, 'Try again.'))
       return false
     }
   }
@@ -253,7 +254,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       )
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't generate draws", e?.message || 'Try again.')
+      toastError("Couldn't generate draws", plainError(e, 'Try again.'))
       // The write may have reached the server with its answer lost. Read
       // the draws again before Generate is offered, so a retry cannot add
       // a second set.
@@ -290,7 +291,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       toastSuccess('Marked paid', `Draw #${draw.sequence_number} is covered by payments already logged`)
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't update", e?.message || 'Try again.')
+      toastError("Couldn't update", plainError(e, 'Try again.'))
     } finally {
       setBusyId(null)
     }
@@ -313,7 +314,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       toastSuccess('Draw voided', `Draw #${draw.sequence_number}`)
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't void", e?.message || 'Try again.')
+      toastError("Couldn't void", plainError(e, 'Try again.'))
     } finally {
       setBusyId(null)
     }
@@ -340,7 +341,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       toastSuccess('Draw deleted', '')
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't delete", e?.message || 'Try again.')
+      toastError("Couldn't delete", plainError(e, 'Try again.'))
     }
   }
 
@@ -450,7 +451,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       downloadPdf(result)
       toastSuccess('Draw PDF downloaded', result.filename)
     } catch (e: any) {
-      toastError("Couldn't generate PDF", e?.message || 'Try again.')
+      toastError("Couldn't generate PDF", plainError(e, 'Try again.'))
     } finally {
       setBusyId(null)
     }
@@ -497,7 +498,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       const { error: upErr } = await supabase.storage
         .from('job-files')
         .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-      if (upErr) throw new Error(`Couldn't save the draw PDF: ${upErr.message}`)
+      if (upErr) throw new Error(plainError(upErr, 'The draw PDF could not be saved, so nothing was sent. Try again.'))
 
       // Audit row, best-effort, never blocks the send.
       try {
@@ -545,9 +546,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
         return
       }
       if (!sendRes.ok || !sendBody?.ok) {
-        const detail = sendBody?.message || sendBody?.detail || sendBody?.error || 'Unknown provider error'
-        const status = sendBody?.provider_status ? ` (HTTP ${sendBody.provider_status})` : ''
-        throw new Error(`Resend rejected${status}: ${detail}`)
+        throw new Error(plainError({ ...sendBody, status: sendRes.status }, 'The draw was not sent. Try again.'))
       }
 
       // Flip the draw to 'sent' so the row badge updates immediately.
@@ -566,7 +565,7 @@ export default function InvoiceDrawsSection({ contact, payments = [], changeOrde
       toastSuccess(`Draw sent to ${recipientEmail}`, result.filename)
       await fetchDraws()
     } catch (e: any) {
-      toastError("Couldn't send draw", e?.message || 'Try again.')
+      toastError("Couldn't send draw", plainError(e, 'The draw was not sent. Try again.'))
     } finally {
       setBusyId(null)
     }

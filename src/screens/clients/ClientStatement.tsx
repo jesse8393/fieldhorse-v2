@@ -25,6 +25,7 @@ import { moneyExact } from '../../lib/format.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import { recordRoute } from '../../lib/records.ts'
 import './client-statement.css'
+import { plainError } from '../../lib/serviceErrors.ts'
 
 // A statement is a financial document: every figure here must match the
 // PDF and the email to the cent, never a "$12K" abbreviation.
@@ -80,7 +81,7 @@ export default function ClientStatement() {
       await downloadStatement({ company: await loadCompany(), client, data })
       toastSuccess('Statement downloaded', `${money(data.totalDue)} across ${data.lines.length} invoice${data.lines.length === 1 ? '' : 's'}`)
     } catch (e: any) {
-      toast('Could not generate the statement', { description: e?.message || 'Try again' })
+      toast('Could not generate the statement', { description: plainError(e, 'Try again.') })
     } finally {
       setBusy(null)
     }
@@ -100,7 +101,7 @@ export default function ClientStatement() {
         toastInfo('Email not set up, downloaded instead', 'The statement PDF was saved to your device.')
         goBack()
       } else {
-        toast("Couldn't send the statement", { description: res.message || 'Try again' })
+        toast("Couldn't send the statement", { description: res.message || 'The statement was not sent. Try again.' })
       }
     } finally {
       setBusy(null)
@@ -125,7 +126,7 @@ export default function ClientStatement() {
         toastSuccess('Statement link ready', url)
       }
     } catch (e: any) {
-      toast("Couldn't create the link", { description: e?.message || 'Try again' })
+      toast("Couldn't create the link", { description: plainError(e, 'Try again.') })
     } finally {
       setBusy(null)
     }

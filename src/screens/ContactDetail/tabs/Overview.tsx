@@ -27,6 +27,7 @@ import SpineList from '../phone/SpineList.tsx'
 import TodosSection from '../sections/Todos.tsx'
 import JobVisitSummary from '../../../components/fh/JobVisitSummary.tsx'
 import { useMembership } from '../../../contexts/MembershipContext.tsx'
+import { plainError } from '../../../lib/serviceErrors.ts'
 
 /**
  * v3 OVERVIEW tab, the "money screen" of the Job Detail.
@@ -162,7 +163,7 @@ export default function OverviewTab({
             .eq('id', todoId)
             .select('id')
           if (error || !updated || updated.length === 0) {
-            toastError("Couldn't mark task done", error?.message || 'This task may have been removed. Refresh and try again.')
+            toastError("Couldn't mark task done", plainError(error, 'This task may have been removed. Refresh and try again.'))
             await fetchAll() // roll the optimistic flip back
           } else {
             toastSuccess('Task complete')
@@ -229,7 +230,7 @@ export default function OverviewTab({
           onOpenAddEvent?.()
       }
     } catch (e: any) {
-      toastError("Couldn't complete action", e?.message || 'Unknown error')
+      toastError("Couldn't complete action", plainError(e, 'Try again.'))
     } finally {
       setActionLoading(false)
     }
