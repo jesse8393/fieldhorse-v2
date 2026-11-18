@@ -200,6 +200,9 @@ useEffect(() => {
     <EmptyState
       icon={MapPin}
       title="Pin your location to see the forecast."
+      // A refused pin has to say why here: the strip that shows errors
+      // once a location is set is not on screen yet.
+      sub={err ? <span role="alert" style={{ color: 'var(--v3-danger-text)' }}>{err}</span> : undefined}
       action={
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
           <Button variant="primary" size="md" onClick={() => { hapticMedium(); pinLocation() }}>Pin location</Button>

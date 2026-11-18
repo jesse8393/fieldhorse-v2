@@ -120,3 +120,12 @@ test('a crew member with no location of their own can pin one and see the foreca
   await expect(main.locator('.fhc-empty')).toHaveCount(0, { timeout: 15_000 })
   await expect(page.getByText('Within configured weather limits', { exact: true }).first()).toBeVisible({ timeout: 15_000 })
 })
+
+// A phone with location switched off refuses the pin. The no location
+// state must say why, or the tap looks like it did nothing.
+test('a refused Pin location says why on the no location screen', async ({ context, page }) => {
+  const { main, ask } = await openWithNoLocation(context, page, { geolocation: 'deny' })
+  await ask.getByRole('button', { name: 'Pin location', exact: true }).click()
+  await expect(main.getByRole('alert').filter({ hasText: 'Location access is off' })).toBeVisible({ timeout: 5_000 })
+  await expect(ask.getByRole('button', { name: 'Pin location', exact: true })).toBeVisible()
+})
