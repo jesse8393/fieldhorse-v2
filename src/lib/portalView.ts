@@ -120,6 +120,8 @@ export type PublicDocCompany = {
   warranty_default?: string | null
   payment_link?: string | null
   payment_instructions?: string | null
+  /** The company's time zone, so a document's dates read the day the company set (formats-2). */
+  timezone?: string | null
 }
 
 export type PublicDocPayload = {
@@ -269,10 +271,28 @@ function endSentence(s: string): string {
   return /[.!?]$/.test(t) ? t : `${t}.`
 }
 
+// The calendar day a stored value names, as a local midnight. A timestamp is
+// read in the company's zone when the link carries it, so a customer in
+// another zone reads the day the company set, the day the PDF and the app
+// print (formats-2). A bare date is that calendar day in any zone.
+function calendarDay(iso: unknown, timeZone?: string | null): Date | null {
+  const raw = text(iso) || null
+  const d = parseDateOnly(raw)
+  if (!d || !timeZone || /^\d{4}-\d{2}-\d{2}$/.test(String(raw))) return d
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(d)
+    const part = (type: string) => Number(parts.find((p) => p.type === type)?.value)
+    return new Date(part('year'), part('month') - 1, part('day'))
+  } catch {
+    // An unknown zone name: read it in the viewer's zone as before.
+    return d
+  }
+}
+
 // "October 9" in the current year, "December 30, 2025" in any other. A
 // bare date is read as that calendar day, not as midnight UTC.
-function pageDate(iso: unknown, now: Date): string | null {
-  const d = parseDateOnly(text(iso) || null)
+function pageDate(iso: unknown, now: Date, timeZone?: string | null): string | null {
+  const d = calendarDay(iso, timeZone)
   if (!d) return null
   const base = `${MONTHS[d.getMonth()]} ${d.getDate()}`
   return d.getFullYear() === now.getFullYear() ? base : `${base}, ${d.getFullYear()}`
@@ -280,13 +300,13 @@ function pageDate(iso: unknown, now: Date): string | null {
 
 // When a quote stops being approvable: the end of the day the page says it
 // is valid until, in the viewer's time. The app stores quote_expires_at as
-// the end of the chosen day in the contractor's zone; a viewer elsewhere
-// reads that instant as a date (pageDate), and the quote is good through
+// the end of the chosen day in the contractor's zone; the page reads that
+// instant as a date (pageDate), and the quote is good through
 // the whole of that date, so "Valid until" and the moment it flips never
 // disagree. A bare date is good through that day too. This is never later
 // than the server allows, which is a full day past the stored instant.
-function expiryInstant(iso: unknown): number | null {
-  const d = parseDateOnly(text(iso) || null)
+function expiryInstant(iso: unknown, timeZone?: string | null): number | null {
+  const d = calendarDay(iso, timeZone)
   if (!d) return null
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime()
 }
@@ -485,6 +505,7 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   const contact = payload.contact || {}
   const company = payload.company || {}
   const companyName = text(company.name) || FALLBACK_COMPANY
+  const zone = text(company.timezone) || null
   // A person is greeted by first name; a company gets "Hi there".
   const firstName = personFirstName(contact.name) || ''
 
@@ -529,7 +550,7 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   const status = portalStatus(payload)
   const isApproved = status === 'approved'
   const approved = isApproved
-    ? { name: text(contact.approved_by_name) || null, date: pageDate(contact.approved_at, now) }
+    ? { name: text(contact.approved_by_name) || null, date: pageDate(contact.approved_at, now, zone) }
     : null
 
   // The same issue date and number the letter themes print (ProposalTemplate).
@@ -547,7 +568,7 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
   // contractor. The Quote tab reads it the same way (quoteStatus.ts).
   const changesRequested = status === 'changes_requested'
   const decided = isApproved || changesRequested
-  const expiresAt = expiryInstant(contact.quote_expires_at)
+  const expiresAt = expiryInstant(contact.quote_expires_at, zone)
   const expired = !decided && (status === 'expired' || (expiresAt != null && expiresAt < now.getTime()))
   // What the endpoints still accept (see CLOSED_STAGES above): a lost or
   // closed job takes no approval, and a declined quote or a started job
@@ -580,8 +601,8 @@ export function buildPortalView(payload: PublicDocPayload, now: Date): PortalVie
     headline,
     addressLine,
     quoteNumber,
-    issuedOn: pageDate(issuedIso, now),
-    validUntil: pageDate(contact.quote_expires_at, now),
+    issuedOn: pageDate(issuedIso, now, zone),
+    validUntil: pageDate(contact.quote_expires_at, now, zone),
     expired,
     closed,
     jobFinished,

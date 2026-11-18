@@ -30,7 +30,7 @@ import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Phone } from 'lucide-react'
 import { DOC_COLORS, DOC_FONTS, THEME_PALETTES } from './tokens.ts'
-import { money, longDate } from './format.ts'
+import { money, longDate, zonedDocumentDate } from './format.ts'
 import { formatPhone } from '../../lib/utils.ts'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
@@ -156,17 +156,13 @@ function ItemDescription({ item }: { item: ProposalLineItem }) {
   return <><span style={{ whiteSpace: 'pre-wrap' }}>{item.description}</span>{item.notes && <div className="fh-doc-item-notes">{item.notes}</div>}</>
 }
 
-function fmtDate(d: any) {
-  if (!d) return ''
-  const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return ''
-  return dt.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit', year: 'numeric' })
+// Dates print in the company's zone when the document knows it, the way
+// the classic estimate and the invoice print them (formats-2).
+function fmtDate(d: any, timeZone?: string | null) {
+  return zonedDocumentDate(d, { month: '2-digit', day: '2-digit', year: 'numeric' }, timeZone)
 }
-function fmtLongDate(d: any) {
-  if (!d) return ''
-  const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return ''
-  return dt.toLocaleDateString(undefined, { month: 'long', day: '2-digit', year: 'numeric' })
+function fmtLongDate(d: any, timeZone?: string | null) {
+  return zonedDocumentDate(d, { month: 'long', day: '2-digit', year: 'numeric' }, timeZone)
 }
 
 /* ─── Shared supporting sections (scope prose, terms, exclusions,
@@ -265,8 +261,8 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
           By signing below, the customer authorizes the company to perform the work outlined in this estimate and agrees to the terms and conditions contained herein.
         </p>
         <div className="fh-doc-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-          <SignatureLine label="Client signature" name={stamped ? (approval?.clientName || recipient?.name) : null} dataUrl={stamped ? approval?.clientSignatureDataUrl : null} date={stamped ? approvedAt : ''} muted={muted} />
-          <SignatureLine label="Contractor signature" name={stamped ? company?.name : null} dataUrl={stamped ? approval?.contractorSignatureDataUrl : null} date={stamped ? approval?.contractorApprovedAt : ''} muted={muted} />
+          <SignatureLine label="Client signature" name={stamped ? (approval?.clientName || recipient?.name) : null} dataUrl={stamped ? approval?.clientSignatureDataUrl : null} date={stamped ? approvedAt : ''} timeZone={company?.timezone} muted={muted} />
+          <SignatureLine label="Contractor signature" name={stamped ? company?.name : null} dataUrl={stamped ? approval?.contractorSignatureDataUrl : null} date={stamped ? approval?.contractorApprovedAt : ''} timeZone={company?.timezone} muted={muted} />
         </div>
         {stamped ? (
           <p style={{ margin: '14px 0 0', fontSize: 12, color: muted, lineHeight: 1.5 }}>
@@ -274,7 +270,7 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
           </p>
         ) : isApproved ? (
           <p style={{ margin: '14px 0 0', fontSize: 12, color: accent, fontWeight: 600, lineHeight: 1.5 }}>
-            {approvedAt ? `Approved electronically on ${fmtDate(approvedAt)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
+            {approvedAt ? `Approved electronically on ${fmtDate(approvedAt, company?.timezone)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
           </p>
         ) : null}
       </section>
@@ -282,7 +278,7 @@ function SupportingSections({ view, accent, muted = '#5C5C5C', mid = '#141414', 
   )
 }
 
-function SignatureLine({ label, name, dataUrl, date, muted }: any) {
+function SignatureLine({ label, name, dataUrl, date, timeZone, muted }: any) {
   return (
     <div>
       <div style={{ height: 52, display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid #141414', paddingBottom: 4 }}>
@@ -292,7 +288,7 @@ function SignatureLine({ label, name, dataUrl, date, muted }: any) {
       </div>
       <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 12, color: muted, letterSpacing: 0 }}>
         <span style={{ fontWeight: 700, letterSpacing: 0, textTransform: 'uppercase' }}>{label}</span>
-        <span>Date{date ? `: ${fmtDate(date)}` : ''}</span>
+        <span>Date{date ? `: ${fmtDate(date, timeZone)}` : ''}</span>
       </div>
     </div>
   )
@@ -354,8 +350,8 @@ export function SlateProposal({ view }: { view: ProposalView }) {
 
       <div className="fh-doc-columns fh-doc-meta-band" style={{ background: bar, color: pal.onAccent, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '12px 24px', margin: `0 -${PAD - 0}px`, paddingLeft: PAD, paddingRight: PAD }}>
         <MetaCell label="Estimate No." value={view.number} />
-        <MetaCell label="Issue Date" value={fmtDate(view.issuedAt) || '\u2003'} />
-        <MetaCell label="Valid Until" value={fmtDate(view.expiresAt) || '\u2003'} />
+        <MetaCell label="Issue Date" value={fmtDate(view.issuedAt, company?.timezone) || '\u2003'} />
+        <MetaCell label="Valid Until" value={fmtDate(view.expiresAt, company?.timezone) || '\u2003'} />
       </div>
 
       <div className="fh-doc-columns" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 0 24px', borderBottom: `1px solid ${pal.rule}` }}>
@@ -429,8 +425,8 @@ export function MintProposal({ view }: { view: ProposalView }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <MintMeta label="Estimate #" value={view.number} green={green} />
-          <MintMeta label="Estimate date" value={fmtDate(view.issuedAt) || '\u2003'} green={green} />
-          <MintMeta label="Valid until" value={fmtDate(view.expiresAt) || '\u2003'} green={green} />
+          <MintMeta label="Estimate date" value={fmtDate(view.issuedAt, company?.timezone) || '\u2003'} green={green} />
+          <MintMeta label="Valid until" value={fmtDate(view.expiresAt, company?.timezone) || '\u2003'} green={green} />
         </div>
       </div>
 
@@ -491,7 +487,7 @@ export function EditorialProposal({ view }: { view: ProposalView }) {
         <EditCol label="" lines={[company?.name, ...addressLines(company)]} tan={tan} />
         <EditCol label="" lines={[recipient?.name, ...addressLines(recipient)]} tan={tan} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <EditMeta label="Date" value={fmtDate(view.issuedAt) || '\u2003'} tan={tan} />
+          <EditMeta label="Date" value={fmtDate(view.issuedAt, company?.timezone) || '\u2003'} tan={tan} />
           <EditMeta label="Estimate #" value={view.number} tan={tan} />
           <EditMeta label="Est. Total" value={money(view.total)} tan={tan} />
         </div>
@@ -807,8 +803,8 @@ function NotOpenCapsule({ pv, callDigits }: { pv: PortalView; callDigits: string
   )
 }
 
-function ChangesRequestedCapsule({ pv, note, requestedAt }: { pv: PortalView; note?: string | null; requestedAt?: string | null }) {
-  const received = longDate(requestedAt)
+function ChangesRequestedCapsule({ pv, note, requestedAt, timeZone }: { pv: PortalView; note?: string | null; requestedAt?: string | null; timeZone?: string | null }) {
+  const received = longDate(requestedAt, timeZone)
   return (
     <div className="fhp-dock">
       <section className="fhp-capsule fh-onyx-scope fh-grain" aria-label="Changes requested">
@@ -863,6 +859,7 @@ export function FieldhorseProposal({ view }: { view: ProposalView }) {
         pv={pv}
         note={payload.contact?.quote_change_request_note}
         requestedAt={payload.contact?.quote_change_requested_at}
+        timeZone={payload.company?.timezone}
       />
     )
   } else if (pv.expired) capsule = <NotOpenCapsule pv={pv} callDigits={callDigits} />

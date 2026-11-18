@@ -25,7 +25,7 @@ import LineItemsTable from './LineItemsTable.tsx'
 import InsuranceModeBlock from './InsuranceModeBlock.tsx'
 import ChangeOrdersBlock from './ChangeOrdersBlock.tsx'
 import { DOC_COLORS, DOC_FONTS, resolveBrandGold } from './tokens.ts'
-import { money, longDate } from './format.ts'
+import { money, longDate, shortDate } from './format.ts'
 import { proposalNumber } from './numbers.ts'
 import { groupPhotosByTag } from './photoGroups.ts'
 import { SlateProposal, MintProposal, EditorialProposal, FieldhorseProposal } from './proposalThemes.tsx'
@@ -162,8 +162,8 @@ export default function ProposalTemplate({
       docType="Estimate"
       number={number}
       metaRows={[
-        { label: 'Issued', value: longDate(issuedAt) || '\u2003' },
-        expiresAt && { label: 'Valid until', value: longDate(expiresAt), strong: true }
+        { label: 'Issued', value: longDate(issuedAt, company?.timezone) || '\u2003' },
+        expiresAt && { label: 'Valid until', value: longDate(expiresAt, company?.timezone), strong: true }
       ].filter(Boolean)}
       status={statusChip}
       recipient={contact}
@@ -175,6 +175,7 @@ export default function ProposalTemplate({
           total={grandTotal}
           itemCount={itemCount}
           expiresAt={expiresAt}
+          timeZone={company?.timezone}
           approved={String(status).toLowerCase() === 'approved'}
         />
       }
@@ -280,7 +281,7 @@ function normalizeItem(it: any) {
 
 /* ─── Internal blocks ─── */
 
-function HeroBand({ brand, total, itemCount, expiresAt, approved }: any) {
+function HeroBand({ brand, total, itemCount, expiresAt, timeZone, approved }: any) {
   return (
     <section
       style={{
@@ -317,7 +318,7 @@ function HeroBand({ brand, total, itemCount, expiresAt, approved }: any) {
         {itemCount > 0 && <div>{itemCount} priced line item{itemCount === 1 ? '' : 's'}, itemized below</div>}
         {expiresAt && !approved && (
           <div>
-            Pricing honored through <span style={{ color: DOC_COLORS.ink, fontWeight: 600 }}>{longDate(expiresAt)}</span>
+            Pricing honored through <span style={{ color: DOC_COLORS.ink, fontWeight: 600 }}>{longDate(expiresAt, timeZone)}</span>
           </div>
         )}
         {approved && <div style={{ color: DOC_COLORS.signalGreen, fontWeight: 600 }}>Approved, thank you</div>}
@@ -532,6 +533,7 @@ function ApprovalLines({ company, contact, approval, status }: any) {
           nameUnder={contact?.name}
           dataUrl={stamped ? approval?.clientSignatureDataUrl : null}
           date={stamped ? approvedAt : ''}
+          timeZone={company?.timezone}
           stamped={stamped}
         />
         <SigLine
@@ -540,6 +542,7 @@ function ApprovalLines({ company, contact, approval, status }: any) {
           nameUnder={company?.name}
           dataUrl={stamped ? approval?.contractorSignatureDataUrl : null}
           date={stamped ? approval?.contractorApprovedAt : ''}
+          timeZone={company?.timezone}
           stamped={stamped}
         />
       </div>
@@ -549,14 +552,14 @@ function ApprovalLines({ company, contact, approval, status }: any) {
         </p>
       ) : isApproved ? (
         <p style={{ margin: '14px 0 0', fontSize: 12, color: DOC_COLORS.signalGreen, fontWeight: 600, lineHeight: 1.5 }}>
-          {approvedAt ? `Approved electronically on ${shortDateOnly(approvedAt)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
+          {approvedAt ? `Approved electronically on ${shortDate(approvedAt, company?.timezone)}.` : 'Approved electronically.'} A signed record is on file with the contractor.
         </p>
       ) : null}
     </section>
   )
 }
 
-function SigLine({ label, name, nameUnder, dataUrl, date, stamped }: any) {
+function SigLine({ label, name, nameUnder, dataUrl, date, timeZone, stamped }: any) {
   return (
     <div>
       <div
@@ -591,18 +594,11 @@ function SigLine({ label, name, nameUnder, dataUrl, date, stamped }: any) {
           {label}{!stamped && nameUnder ? `, ${nameUnder}` : ''}
         </span>
         <span style={{ fontSize: 12 }}>
-          Date{date ? `: ${shortDateOnly(date)}` : ''}
+          Date{date ? `: ${shortDate(date, timeZone)}` : ''}
         </span>
       </div>
     </div>
   )
-}
-
-function shortDateOnly(d: any) {
-  if (!d) return ''
-  const dt = d instanceof Date ? d : new Date(d)
-  if (Number.isNaN(dt.getTime())) return ''
-  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function statusToChip(status: any) {

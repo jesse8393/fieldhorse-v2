@@ -25,9 +25,16 @@ export function money(n: number | string | null | undefined, _options: { cents?:
 // and the app print, not the next one (formats-2). A bare date keeps its
 // calendar day in any zone.
 function documentDate(iso: string | Date | null | undefined, month: 'long' | 'short', timeZone?: string | null) {
+  return zonedDocumentDate(iso, { month, day: 'numeric', year: 'numeric' }, timeZone)
+}
+
+/**
+ * A document date in any layout (the estimate themes print "11/09/2026"),
+ * with the same company zone rule as longDate and shortDate.
+ */
+export function zonedDocumentDate(iso: string | Date | null | undefined, options: Intl.DateTimeFormatOptions, timeZone?: string | null) {
   const d = parseDateOnly(iso)
   if (!d) return ''
-  const options: Intl.DateTimeFormatOptions = { month, day: 'numeric', year: 'numeric' }
   const bareDate = typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)
   if (timeZone && !bareDate) {
     try {

@@ -1888,4 +1888,23 @@ test.describe('a customer on Eastern time (formats-2)', () => {
     expect(text).not.toContain('November 25, 2026')
     expect(text).not.toContain('November 10, 2026')
   })
+
+  for (const template of ['fieldhorse', 'classic']) {
+    test(`the ${template} quote link shows the issue and expiry days the company set`, async ({ page, context }) => {
+      await page.clock.setFixedTime(new Date('2026-11-17T16:00:00Z'))
+      // Made Mon Nov 9 at 11:30 pm Central; valid through Dec 9, stored at
+      // the end of that day in Central time.
+      await mockPortal(context, proposalPayload({
+        company: { timezone: 'America/Chicago', estimate_template: template },
+        contact: { created_at: '2026-11-10T05:30:00Z', quote_sent_at: '2026-11-10T05:30:00Z', quote_expires_at: '2026-12-10T05:59:59.999Z' }
+      }))
+      await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+      await expect(page.getByText('Pool deck pour').first()).toBeVisible()
+      const text = await page.locator('body').innerText()
+      expect(text).toMatch(/November 9\b/)
+      expect(text).toMatch(/December 9\b/)
+      expect(text).not.toMatch(/November 10\b/)
+      expect(text).not.toMatch(/December 10\b/)
+    })
+  }
 })
