@@ -74,7 +74,8 @@ type ChangeOrderRow = Pick<
 type InvoiceRow = Pick<
   Database['public']['Tables']['fh_invoices']['Row'],
   'id' | 'contact_id' | 'title' | 'amount' | 'due_at' | 'status'
-> & Partial<Pick<Database['public']['Tables']['fh_invoices']['Row'], 'sequence_number' | 'created_at'>>
+> & Partial<Pick<Database['public']['Tables']['fh_invoices']['Row'], 'sequence_number' | 'created_at' | 'client_id'>>
+  & { fh_clients?: ClientName }
 
 export type DashboardTone = 'good' | 'warn' | 'bad' | 'neutral'
 export type HomePriorityTone = 'success' | 'warn' | 'danger'
@@ -106,6 +107,8 @@ export type HomeNextAction = {
   contactId: string
   /** Present on lead follow ups so missing details can be repaired. */
   clientId?: string | null
+  /** The invoice a past due row reminds about, billed to a job or to the client alone. */
+  invoiceId?: string
   contactPhone?: string | null
   verb: string
   contactName: string
@@ -544,19 +547,23 @@ export function buildHomeDashboardBundle(source: HomeDashboardSource): HomeDashb
     // late read the same on Today as on Money.
     const due = new Date(standing.dueDay.getFullYear(), standing.dueDay.getMonth(), standing.dueDay.getDate(), 12)
     const contact = invoice.contact_id ? contactsById.get(invoice.contact_id) : undefined
+    // The job's name, or for an invoice billed to the client alone (D62),
+    // the client's.
+    const billedTo = invoice.fh_clients?.name?.trim() || ''
     actions.push({
       id: `inv-overdue-${invoice.id}`,
       kind: 'inv-overdue',
       recordKind: 'job',
       recordId: invoice.contact_id ?? '',
       contactId: invoice.contact_id ?? '',
+      invoiceId: invoice.id,
       verb: 'Nudge',
-      contactName: contactName(contact),
+      contactName: contactName(contact, billedTo || 'Customer'),
       contactAmount: standing.owed,
       dueIso: due.toISOString(),
       dueKind: 'overdue',
       title: `Invoice ${daysLate}d past due`,
-      detail: `${invoice.title || 'Invoice'}, ${standing.owed.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} owed, ${contactName(contact, 'customer')}`,
+      detail: `${invoice.title || 'Invoice'}, ${standing.owed.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} owed, ${contactName(contact, billedTo || 'customer')}`,
       urgencyLabel: 'Past due',
       urgencyTone: 'danger',
       urgency: Math.max(1, 100 - daysLate),
@@ -704,7 +711,7 @@ async function fetchAllLabelled<T>(label: string, build: Parameters<typeof fetch
 const CONTACT_COLUMNS =
   'id, name, amount, stage, updated_at, created_at, completed_at, follow_up_on, proposal_status, quote_change_request_note, quote_change_requested_at, address, job_title'
 
-const INVOICE_COLUMNS = 'id, contact_id, title, amount, due_at, status, sequence_number, created_at'
+const INVOICE_COLUMNS = 'id, contact_id, client_id, title, amount, due_at, status, sequence_number, created_at, fh_clients!fh_invoices_client_id_fkey(name)'
 
 const LEAD_COLUMNS = 'id, client_id, title, status, follow_up_on, last_contact, created_at, updated_at, fh_clients!fh_leads_client_id_fkey(name, phone)'
 

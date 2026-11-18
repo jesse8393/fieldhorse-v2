@@ -56,6 +56,21 @@ test('New opens a full screen with five rows', async ({ context, page }) => {
   await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
 })
 
+// dead-ends-3: crew and foremen cannot create leads, quotes, jobs or
+// invoices, so the header offers them no New to tap and bounce off.
+for (const role of ['crew', 'foreman']) {
+  test(`${role} see no New button in the header`, async ({ context, page }) => {
+    await signIn(context, { role })
+    for (const path of ['/crew', '/schedule', '/jobs']) {
+      await open(page, path)
+      const header = page.locator('.fh-app-header')
+      await expect(header.getByRole('button', { name: 'Search everything' })).toBeVisible({ timeout: 30_000 })
+      await expect(header.getByRole('link', { name: 'New', exact: true })).toHaveCount(0)
+      await expect(page).toHaveURL(new RegExp(`${path}$`))
+    }
+  })
+}
+
 test('New quote never shows the lead form', async ({ context, page }) => {
   await signIn(context)
   await open(page, '/new')

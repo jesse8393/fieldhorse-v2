@@ -3,7 +3,7 @@ import { edgeRuntime } from './edgeRuntimeTestUtils'
 
 const row = { id: 'outbox', org_id: 'company', client_id: 'client', message_id: 'message', agent_run_id: 'run', payload: {}, attempts: 1 }
 const inbound = (body: string, day: number) => ({ channel: 'sms', direction: 'inbound', body, created_at: `2026-10-${day}T12:00:00Z` })
-function agentFixture(options: { history?: any[]; historyError?: boolean; countError?: boolean; escalation?: boolean } = {}) {
+function agentFixture(options: { history?: any[]; historyError?: boolean; countError?: boolean; escalation?: boolean; run?: Record<string, unknown>; content?: any[] } = {}) {
   const rpc = vi.fn(async (fn: string) => ({ data: fn === 'fh_client_ctx' ? { client: {}, job: {} } : 'fixture', error: null }))
   const writes: any[] = []
   const from = (table: string) => {
@@ -15,7 +15,7 @@ function agentFixture(options: { history?: any[]; historyError?: boolean; countE
       eq: () => query, neq: () => query, order: () => query, gte: () => query, limit: () => query, single: () => query, maybeSingle: () => query,
       then: (resolve: any) => {
         if (patch) return Promise.resolve({ data: { id: "run" }, error: null }).then(resolve)
-        if (table === 'fh_agent_runs') return Promise.resolve({ data: { id: 'run', org_id: 'company', client_id: 'client', agent_id: 'agent', status: 'pending', mode: 'auto' } }).then(resolve)
+        if (table === 'fh_agent_runs') return Promise.resolve({ data: { id: 'run', org_id: 'company', client_id: 'client', agent_id: 'agent', status: 'pending', mode: 'auto', ...options.run } }).then(resolve)
         if (table === 'fh_agents') return Promise.resolve({ data: { id: 'agent', status: 'active', name: 'Fixture', autonomy: 'auto', guardrails: { escalate_keywords: ['lawyer'], max_messages_per_client_per_day: 3 } } }).then(resolve)
         return Promise.resolve(head ? { count: options.countError ? null : 0, error: options.countError ? { message: 'unavailable' } : null } : {
           data: options.history ?? [inbound('hello', 31)], error: options.historyError ? { message: 'unavailable' } : null
@@ -24,7 +24,7 @@ function agentFixture(options: { history?: any[]; historyError?: boolean; countE
     }
     return query
   }
-  const content = [{ type: 'tool_use', name: 'propose_message', input: { channel: 'sms', body: 'A draft reply' } }]
+  const content: any[] = options.content ?? [{ type: 'tool_use', name: 'propose_message', input: { channel: 'sms', body: 'A draft reply' } }]
   if (options.escalation) content.push({ type: 'tool_use', name: 'escalate', input: { summary: 'Owner review required' } } as any)
   const fetch = vi.fn(async () => new Response(JSON.stringify({ content }), { status: 200 }))
   const runtime = edgeRuntime({ ANTHROPIC_API_KEY: 'fixture' }, { fetch })
@@ -64,6 +64,31 @@ describe('automation worker guardrails', () => {
     const fixture = agentFixture()
     expect((await fixture.worker.runAgent(fixture.db, row)).result.status).toBe('auto_executed')
     expect(fixture.rpc.mock.calls.filter(([name]) => name === 'fh_agent_run_approve')).toHaveLength(1)
+  })
+
+  // dead-ends-7: the owner's alerts open the client's conversation, not the
+  // whole Inbox. A run with no conversation keeps the client link, which
+  // the Inbox opens as that client's conversation.
+  it('links each alert to the client\'s conversation', async () => {
+    const links = (f: ReturnType<typeof agentFixture>) => f.rpc.mock.calls
+      .filter((c: any[]) => c[0] === 'fh_notify_org').map((c: any[]) => c[1]?.p_link)
+    const draft = agentFixture({ run: { conversation_id: 'conv-1', mode: 'draft' } })
+    await draft.worker.runAgent(draft.db, row)
+    expect(links(draft)).toEqual(['/inbox/conv-1'])
+
+    const escalated = agentFixture({
+      run: { conversation_id: 'conv-1' },
+      content: [
+        { type: 'tool_use', name: 'create_task', input: { text: 'Call back about the price' } },
+        { type: 'tool_use', name: 'escalate', input: { summary: 'Price question' } }
+      ]
+    })
+    expect((await escalated.worker.runAgent(escalated.db, row)).result.status).toBe('escalated')
+    expect(links(escalated)).toEqual(['/inbox/conv-1', '/inbox/conv-1'])
+
+    const loose = agentFixture({ run: { mode: 'draft' } })
+    await loose.worker.runAgent(loose.db, row)
+    expect(links(loose)).toEqual(['/inbox?client=client'])
   })
 
   it('rejects a message from another company or customer before provider access', async () => {

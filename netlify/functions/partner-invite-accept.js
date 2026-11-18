@@ -110,7 +110,7 @@ export default async (request) => {
   await sendPushToUser(admin, invite.invited_by_user_id, {
     title: 'Partner joined your job',
     body: `${invite.partner_email} accepted the invite`,
-    link: `/jobs/${invite.job_id}?tab=partners`,
+    link: `/jobs/${invite.job_id}?tab=partner`,
     tag: `partner-accepted-${invite.id}`
   }, { orgId: invite.org_id })
 

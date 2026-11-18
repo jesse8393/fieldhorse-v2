@@ -59,6 +59,9 @@ export default function Dock() {
   const hidden = hiddenByScreen || keyboardOpen
   const night = theme === 'dark'
   const captureShortcut = desktopShortcut('J', browserEnv())
+  // With no company role nothing here opens (dead-ends-2): no dock.
+  const canCapture = canSee('/capture')
+  if (!left.length && !right.length && !canCapture) return null
 
   const dock = (
     <nav
@@ -68,7 +71,7 @@ export default function Dock() {
       <div className="fhs-dock__side">
         {left.map((item) => <DockItem key={item.to} item={item} pathname={pathname} night={night} />)}
       </div>
-      <div className="fhs-dock__center">
+      {canCapture && <div className="fhs-dock__center">
         <button
           type="button"
           className="fhs-dock__coin"
@@ -83,7 +86,7 @@ export default function Dock() {
           <Icon icon={Plus} size={24} />
         </button>
         <span className="fhs-dock__label fhs-dock__label--coin" aria-hidden="true">Capture</span>
-      </div>
+      </div>}
       <div className="fhs-dock__side">
         {right.map((item) => <DockItem key={item.to} item={item} pathname={pathname} night={night} />)}
       </div>

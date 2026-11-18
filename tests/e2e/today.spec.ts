@@ -211,6 +211,34 @@ async function loadingThenNextStop(context: BrowserContext, page: Page) {
   return { loading, band: (await nextStop.boundingBox())!.height }
 }
 
+// dead-ends-1: two sent invoices past due on October 8, one billing Harold
+// Wickham's job and one billing the client with no job (D62). No payments,
+// so both are owed in full.
+const ROY = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com', address: '412 Burkitt Station Rd' }
+const PAST_DUE = [
+  { id: 'inv-job', contact_id: 'c-job2', title: 'Progress draw 1', amount: 6400, sequence_number: 2, issued_at: '2026-09-18T12:00:00Z', due_at: '2026-09-29T12:00:00Z' },
+  { id: 'inv-client', contact_id: null, title: 'Sidewalk patch', amount: 1800, sequence_number: 3, issued_at: '2026-09-13T12:00:00Z', due_at: '2026-09-26T12:00:00Z' }
+].map((row) => ({ user_id: 'qa-user-1', client_id: 'cl-1', status: 'sent', created_at: row.issued_at, description: null, notes: null, fh_clients: ROY, ...row }))
+
+// Remind on each past due row opens that invoice's reminder screen, never a
+// new invoice or the Jobs list.
+async function remindOpensTheReminder(context: BrowserContext, page: Page) {
+  await signIn(context, { tables: { fh_schedule: SCHEDULE, fh_invoices: PAST_DUE, fh_payments: [] } })
+  await context.route('https://api.open-meteo.com/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast()) })
+  )
+  await page.clock.setFixedTime(MORNING)
+  await page.goto('/?answers=all', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const answers = page.getByRole('region', { name: /Needs an answer/ })
+  const job = answers.getByRole('link', { name: 'Remind, Harold Wickham invoice is 9 days overdue' })
+  await expect(job).toHaveAttribute('href', '/invoices/inv-job/remind', { timeout: 30_000 })
+  const clientOnly = answers.getByRole('link', { name: 'Remind, Jeff Roy invoice is 12 days overdue' })
+  await expect(clientOnly).toHaveAttribute('href', '/invoices/inv-client/remind')
+  await clientOnly.click()
+  await expect(page).toHaveURL(/\/invoices\/inv-client\/remind$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Send a reminder' })).toBeVisible({ timeout: 30_000 })
+}
+
 // Tabs onto the next stop's job name and reads the rings it draws: its
 // own outline, and the one its ::after draws around the whole band.
 async function nextStopFocus(page: Page) {
@@ -321,6 +349,10 @@ test.describe('today on a phone', () => {
   test('every thing waiting counts in the evening, and See all reaches every action', async ({ context, page }) => {
     await setUp(context, page, { at: EVENING, tables: ONLY_QUIET_LEADS })
     await seeAllAnswers(page)
+  })
+
+  test('Remind on a past due invoice opens that invoice\'s reminder', async ({ context, page }) => {
+    await remindOpensTheReminder(context, page)
   })
 
   test('a cold open at 6:30 am shows the morning from last night\'s cache, without last night\'s weather', async ({ context, page }) => {
@@ -494,6 +526,10 @@ test.describe('today on a desktop', () => {
 
   test('a cold open at 6:30 am shows the morning from last night\'s cache, without last night\'s weather', async ({ context, page }) => {
     await coldOpen(context, page)
+  })
+
+  test('Remind on a past due invoice opens that invoice\'s reminder', async ({ context, page }) => {
+    await remindOpensTheReminder(context, page)
   })
 
   test('crew never see money on Today, they are sent to their own home', async ({ context, page }) => {

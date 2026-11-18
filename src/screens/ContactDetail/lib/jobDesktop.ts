@@ -17,6 +17,7 @@
 
 import type { RailSegmentId } from '../../../lib/stageRail.ts'
 import { moneyCents } from '../../../lib/format.ts'
+import { recordRoute } from '../../../lib/records.ts'
 import { spineDay } from './spine.ts'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -145,6 +146,8 @@ export type DocumentRow = {
   detail: string | null
   /** The section that holds it. */
   tab: DocumentTab
+  /** The record's own screen, when it has one: an invoice opens itself (dead-ends-10). */
+  to?: string
 }
 
 export type DocumentContact = {
@@ -219,7 +222,7 @@ export function documentRows({ contact, invoices, files, canSeeMoney, now }: {
       const word = statusWord(inv.status)
       const due = shortDate(inv.due_at, now)
       const detail = word && due && clean(inv.status).toLowerCase() !== 'paid' ? `${word}, due ${due}` : word
-      rows.push({ id: `invoice:${inv.id}`, label, detail, tab: 'financials' })
+      rows.push({ id: `invoice:${inv.id}`, label, detail, tab: 'financials', to: recordRoute('invoice', inv.id) })
     }
   }
 

@@ -104,4 +104,15 @@ describe('a partner accepting an invite', () => {
     expect(res.status).toBe(200)
     expect(sentTo()).toEqual([])
   })
+
+  // dead-ends-6: the push opens the job's Partner access section.
+  it('pushes the inviter a link to the job\'s Partner access', async () => {
+    state.users = { 'tok-partner': { id: 'user-partner', email: 'sub@example.test', email_confirmed_at: '2026-01-01T00:00:00Z' } }
+    state.tables.fh_job_partners = [{ id: 'jp-2', job_id: 'job-1', org_id: ORG, partner_email: 'sub@example.test', status: 'pending', invited_by_user_id: OWNER, invite_token: 'inv-2' }]
+    const res = await acceptPartner(post('/api/partner-invite-accept', 'tok-partner', { token: 'inv-2' }))
+    expect(res.status).toBe(200)
+    expect(sentTo()).toEqual(['https://push.example.test/owner-phone'])
+    const sent = JSON.parse((webpush.sendNotification.mock.calls[0] as unknown[])[1] as string)
+    expect(sent.link).toBe('/jobs/job-1?tab=partner')
+  })
 })

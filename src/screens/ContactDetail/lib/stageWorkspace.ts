@@ -32,11 +32,23 @@ export function tabsForStage(stage?: string | null): DealTabId[] {
   return STAGE_TABS[jobStage(stage)]
 }
 
+// Section ids that links already sent still carry: change order
+// notifications wrote ?tab=quote and the partner push ?tab=partners
+// (dead-ends-6). Each opens the section it meant.
+const OLD_TAB_IDS = new Map<string, DealTabId>([['quote', 'change_orders'], ['partners', 'partner']])
+
+/** The section a ?tab= value names, with an old id read as the one it meant. */
+export function canonicalJobTab(requested: string | null | undefined): string | null {
+  if (!requested) return null
+  return OLD_TAB_IDS.get(requested) ?? requested
+}
+
 // Resolve the tab to actually show: honor the requested tab only if the
 // current stage exposes it, otherwise fall back to overview.
 export function resolveTabForStage(stage: string | null | undefined, requested: string | null | undefined): DealTabId {
   const allowed = tabsForStage(stage)
-  return (requested && allowed.includes(requested as DealTabId)) ? (requested as DealTabId) : 'overview'
+  const tab = canonicalJobTab(requested)
+  return (tab && allowed.includes(tab as DealTabId)) ? (tab as DealTabId) : 'overview'
 }
 
 export type StageCta = { label: string; action: 'invoice' | 'complete' | 'reopen' }

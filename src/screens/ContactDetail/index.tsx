@@ -20,7 +20,7 @@ import DataErrorState from '../../components/DataErrorState.tsx'
 import { Eyebrow } from '../../components/v3'
 import { useJobData } from './hooks/useJobData.ts'
 import { computeJobHealth } from './lib/jobHealth.ts'
-import { tabsForStage, resolveTabForStage, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
+import { tabsForStage, resolveTabForStage, canonicalJobTab, stageCta as stageCtaFor } from './lib/stageWorkspace.ts'
 import { tabsForRole, pickVisibleTab } from './lib/jobAccess.ts'
 import OverviewTab from './tabs/Overview.tsx'
 // Lazy, non-default tabs + sections only render
@@ -90,7 +90,7 @@ type JobActionIntentMeta = {
   title: string
   detail: string
   primaryLabel: string
-  tab: 'overview' | 'financials' | 'change_orders'
+  tab: 'overview' | 'financials' | 'draws' | 'change_orders'
 }
 
 const JOB_ACTION_INTENTS = {
@@ -126,8 +126,10 @@ const JOB_ACTION_INTENTS = {
     eyebrow: 'Collection risk',
     title: 'Invoice past due',
     detail: 'There is an open invoice past its due date. Review the balance and send the customer a reminder.',
-    primaryLabel: 'Open invoice tools',
-    tab: 'financials',
+    // A link Today wrote before it opened the reminder itself: the
+    // Invoices tab lists the bill, which opens its reminder.
+    primaryLabel: 'Open invoices',
+    tab: 'draws',
   },
   change_order_followup: {
     eyebrow: 'Scope control',
@@ -321,7 +323,7 @@ export default function ContactDetail() {
   const visibleTabs = tabsForRole(TOP_TABS.filter((t) => stageTabs.includes(t.id as any)), canSeeMoney)
   // Overview is home for every stage, and the param the URL omits.
   const defaultTab = 'overview'
-  const urlTab = (tabParam && VALID_TABS.has(tabParam))
+  const urlTab = (tabParam && VALID_TABS.has(canonicalJobTab(tabParam) ?? ''))
     ? resolveTabForStage(contact?.stage, tabParam)
     : defaultTab
   const [localTab, setLocalTab] = useState<string | null>(null)
@@ -401,7 +403,7 @@ export default function ContactDetail() {
       openEvent()
       return
     }
-    if (actionIntent === 'send_invoice' || actionIntent === 'nudge_invoice') {
+    if (actionIntent === 'send_invoice') {
       openInvoice()
     }
   }
@@ -809,6 +811,7 @@ export default function ContactDetail() {
           onBack={() => navigate(detailHome)}
           onMore={() => navigate(`${home}/more`)}
           onOpenPhotos={() => openSection('files')}
+          editHref={canMoveMoney ? `${home}?edit=1` : undefined}
         />
 
         {actionIntentMeta && (

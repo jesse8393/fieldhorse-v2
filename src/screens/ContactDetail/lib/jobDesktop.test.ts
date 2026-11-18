@@ -186,6 +186,9 @@ describe('documentRows', () => {
       ['Permit RC 26 0931.pdf', 'Oct 9', 'files'],
       ['Site plan.pdf', 'Sep 20', 'files']
     ])
+    // dead-ends-10: an invoice opens its own screen; the quote and the
+    // files keep switching to their section.
+    expect(rows.map((r) => r.to ?? null)).toEqual([null, '/invoices/i1', '/invoices/i2', null, null])
   })
 
   it('leaves the quote and invoices to money roles', () => {

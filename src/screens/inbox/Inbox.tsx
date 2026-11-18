@@ -8,19 +8,18 @@
 //
 // The Inbox only exists when the company's messaging engine is on
 // (fh_org_settings.engine_enabled). While it is off the screen says
-// "Inbox turns on with messaging" and points to Settings; while the
+// "Inbox turns on with messaging" and who turns it on; while the
 // setting is still loading it shows a skeleton, never the message.
 //
 // There is no gold action here. The one brushed gold button lives in the
 // thread, on the agent's draft.
 
 import { useEffect, useRef } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import CommunicationHistory from '../../components/CommunicationHistory.tsx'
 import { Inbox as InboxIcon, MessageSquare, SquarePen } from 'lucide-react'
 import { Button, Chip, EmptyState, Row, SkeletonRows } from '../../components/fh'
 import DataErrorState from '../../components/DataErrorState.tsx'
-import { useMembership } from '../../contexts/MembershipContext.tsx'
 import { useIsDesktop } from '../../lib/useMediaQuery.ts'
 import { hapticTap } from '../../lib/haptics.ts'
 import {
@@ -115,19 +114,18 @@ function InboxList({ rows, loading, error, onRetry, selectedId }: ListProps) {
   )
 }
 
+// Settings has no switch for messaging and nothing in the app turns it on
+// (dead-ends-5), so every role reads who does, with no button to a dead end.
 function EngineOff() {
-  const { canEditSettings } = useMembership()
   return (
     <div className="fhi-off">
       <EmptyState
         icon={MessageSquare}
         title="Inbox turns on with messaging"
         action={
-          canEditSettings ? (
-            <Button variant="secondary" size="md" to="/settings">Open settings</Button>
-          ) : (
-            <p className="fhi-off__note">Ask an owner or an admin to turn it on. Recorded communications remain available under Communication history.</p>
-          )
+          <p className="fhi-off__note">
+            The FieldHorse team turns messaging on for your company. Email <a href="mailto:support@fieldhorse.com">support@fieldhorse.com</a> to ask. Recorded communications remain available under Communication history.
+          </p>
         }
       />
     </div>
@@ -152,6 +150,15 @@ export default function Inbox() {
 
   const rows = inbox.data ?? []
   const loading = engine === undefined || (engine === true && inbox.isLoading)
+
+  // An agent alert sent before the worker named the conversation links to
+  // /inbox?client=:id: open that client's conversation (dead-ends-7).
+  const navigate = useNavigate()
+  const clientParam = conversationId ? null : params.get('client')
+  const clientConversation = clientParam ? rows.find((r) => r.client_id === clientParam)?.conversation_id : null
+  useEffect(() => {
+    if (clientConversation) navigate(`/inbox/${encodeURIComponent(clientConversation)}`, { replace: true })
+  }, [clientConversation, navigate])
 
   const title = <h1 className="fhi-title" ref={titleRef} tabIndex={-1}>Inbox</h1>
   const header = <header className="fhi-head">{title}<Link className="fhi-new" to="/compose" aria-label="New message" title="New message"><SquarePen size={20} aria-hidden="true" /></Link></header>

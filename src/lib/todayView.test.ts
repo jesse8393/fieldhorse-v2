@@ -4,6 +4,7 @@ import type { HomeDashboardBundle, HomeNextAction, HomeTodayOnSite } from './hom
 import { dayHeadline, nightHeadline } from './todayHeadline.ts'
 import {
   answerCopy,
+  answerRemindPath,
   answerRepairPath,
   buildTodayView,
   currentForecast,
@@ -577,6 +578,19 @@ describe('answerCopy', () => {
       detail: 'Concrete steps - $1,240 - Delgado'
     }), now)
     expect(copy).toEqual({ title: 'Delgado invoice is 6 days overdue', subline: '$1,240.00, due Oct 2', actionLabel: 'Remind', dot: 'danger' })
+  })
+
+  // dead-ends-1: Remind opens the invoice's own reminder screen, for a job
+  // invoice and for one billed to the client with no job. A row cached by
+  // an older build carries the invoice only in its id.
+  it('sends Remind on a past due invoice to that invoice\'s reminder', () => {
+    const job = action(7, { kind: 'inv-overdue', recordKind: 'job', recordId: 'c-job2', contactId: 'c-job2', id: 'inv-overdue-inv-job', invoiceId: 'inv-job' })
+    expect(answerRemindPath(job)).toBe('/invoices/inv-job/remind')
+    const clientOnly = action(8, { kind: 'inv-overdue', recordKind: 'job', recordId: '', contactId: '', id: 'inv-overdue-inv-client', invoiceId: 'inv-client' })
+    expect(answerRemindPath(clientOnly)).toBe('/invoices/inv-client/remind')
+    const cached = action(9, { kind: 'inv-overdue', recordKind: 'job', recordId: 'c-job2', contactId: 'c-job2', id: 'inv-overdue-inv-old' })
+    expect(answerRemindPath(cached)).toBe('/invoices/inv-old/remind')
+    expect(answerRemindPath(action(10))).toBeNull()
   })
 
   it('nudges a quote that was read and not answered', () => {
