@@ -897,6 +897,57 @@ test.describe('typed words in the job sections', () => {
     await expect(page.getByLabel('Site summary')).toHaveCount(0)
   })
 
+  // Review of lost-work-2: an edit to a saved log is kept against that log,
+  // and only once something in it changed.
+  const SAVED_LOG = {
+    id: 'log-saved-1', user_id: 'qa-user-1', contact_id: 'c-job1', log_date: '2026-10-09', summary: 'Formed and set rebar',
+    next_steps: null, weather_text: null, crew_count: 3, hours_worked: null, photos: [], created_at: '2026-10-09T15:00:00.000Z'
+  }
+
+  test('opening a saved daily log to edit it keeps nothing until something changes', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveValue(SAVED_LOG.summary)
+    await page.waitForTimeout(600)
+    await page.reload()
+    await expect(page.getByRole('button', { name: '+ New log' })).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
+  test('an edit to a saved daily log comes back after a reload and saves to that log', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await page.getByLabel('Site summary').fill(WORDS)
+    await page.reload()
+    await expect(page.getByLabel('Site summary')).toHaveValue(WORDS)
+    await expect(page.getByText('Unsaved changes restored')).toBeVisible()
+    const writes: string[] = []
+    page.on('request', (request) => { if (/\/rest\/v1\/fh_daily_logs/.test(request.url()) && request.method() !== 'GET') writes.push(request.method()) })
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    expect(writes).toEqual(['PATCH'])
+  })
+
+  test('an edit to a daily log saved differently since is dropped', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_daily_logs: [SAVED_LOG] } })
+    await context.addInitScript(() => {
+      if (localStorage.getItem('e2e:stale-log')) return
+      localStorage.setItem('e2e:stale-log', '1')
+      const base = { summary: 'An older summary', nextSteps: '', weatherText: '', crewCount: '3', hoursWorked: '', photos: [] }
+      localStorage.setItem('fh:draft:edit:job-log:log-saved-1', JSON.stringify({ form: { summary: 'Edit made before the log changed' }, base, savedAt: Date.now(), userId: 'qa-user-1' }))
+    })
+    await openJob(page, '/jobs/c-job1?tab=logs')
+    await expect(page.getByText(SAVED_LOG.summary)).toBeVisible()
+    await expect(page.getByLabel('Site summary')).toHaveCount(0)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('fh:draft:edit:job-log:log-saved-1'))).toBeNull()
+    await page.getByRole('button', { name: 'Edit log' }).click()
+    await expect(page.getByLabel('Site summary')).toHaveValue(SAVED_LOG.summary)
+    await expect(page.getByText('Unsaved changes restored')).toHaveCount(0)
+  })
+
   test('a half written job note survives a tap on another section and a reload', async ({ context, page }) => {
     await signIn(context)
     await openJob(page, '/jobs/c-job1?tab=messages')

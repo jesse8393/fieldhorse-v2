@@ -132,6 +132,16 @@ export function sameDraft(a: unknown, b: unknown) {
 }
 
 /**
+ * True when changes are stored for this edit and began from `from`, the
+ * saved value the screen would show now. Removes nothing, so a screen can
+ * ask before it opens the edit.
+ */
+export function draftWaiting(kind: string, from: unknown): boolean {
+  const entry = readDraftEntry(kind)
+  return entry != null && sameDraft(entry.base, from)
+}
+
+/**
  * Where an edit starts: the stored changes over the saved form, when they
  * began from the same saved value (`from`, the form itself unless given)
  * that the screen shows now. A draft whose record changed underneath it

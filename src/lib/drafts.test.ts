@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DRAFT_TTL_MS, clearDraft, clearDrafts, readDraft, readDraftEntry, sameDraft, setDraftOwner, startEdit, writeDraft } from './drafts.ts'
+import { DRAFT_TTL_MS, clearDraft, clearDrafts, draftWaiting, readDraft, readDraftEntry, sameDraft, setDraftOwner, startEdit, writeDraft } from './drafts.ts'
 
 class MemoryStorage {
   private items = new Map<string, string>()
@@ -124,6 +124,14 @@ describe('an edit draft', () => {
     writeDraft('edit:quote-terms:q1', { scope: 'Pour 6 inch' }, { scope: '' })
     expect(startEdit('edit:quote-terms:q1', { scope: 'Saved on another phone' })).toBeNull()
     expect(store.getItem('fh:draft:edit:quote-terms:q1')).toBeNull()
+  })
+
+  it('can be asked about before the edit opens, without removing anything', () => {
+    writeDraft('edit:client:cl-2', { notes: 'Dog in yard' }, { notes: 'Gate code' })
+    expect(draftWaiting('edit:client:cl-2', { notes: 'Gate code' })).toBe(true)
+    expect(draftWaiting('edit:client:cl-2', { notes: 'Changed elsewhere' })).toBe(false)
+    expect(draftWaiting('edit:client:none', { notes: '' })).toBe(false)
+    expect(store.getItem('fh:draft:edit:client:cl-2')).not.toBeNull()
   })
 
   it('compares forms by value', () => {
