@@ -126,6 +126,13 @@ export default function ClientDetail() {
       : { lines: [], totalDue: 0, notInvoiced: [], notInvoicedTotal: 0 },
     [jobs, changeOrders, statementMoney.data]
   )
+  // The control stays one tap away while the total loads or if it cannot be
+  // read, and for work not yet invoiced; it names a figure only once the
+  // read is in and something is owed on sent invoices.
+  const statementTotalKnown = !!statementMoney.data && statementSummary.totalDue > 0
+  const showStatement = jobs.length > 0 && (
+    !statementMoney.data || statementSummary.totalDue > 0 || statementSummary.notInvoicedTotal > 0
+  )
 
   // The first tap checks what would be lost and arms the button, the
   // second deletes. Leads and quotes go with their client and invoices
@@ -283,7 +290,7 @@ export default function ClientDetail() {
           onDelete={() => { void requestDelete() }}
           deleteArmed={deleteTap.armed}
           onNewDeal={openNew}
-          onStatement={statementSummary.totalDue > 0 ? openStatement : undefined}
+          onStatement={showStatement ? openStatement : undefined}
           isEditing={isEditing}
         >
           {tabBody}
@@ -476,7 +483,7 @@ export default function ClientDetail() {
         {/* STATEMENT, roll every open invoice across all this client's
             properties into one document. Only meaningful when there's a
             balance, so it stays hidden otherwise. */}
-        {statementSummary.totalDue > 0 && (
+        {showStatement && (
           <motion.button
             type="button"
             whileTap={{ scale: 0.99 }}
@@ -492,7 +499,9 @@ export default function ClientDetail() {
             }}
           >
             <Receipt size={16} strokeWidth={2.2} aria-hidden="true" />
-            Statement · {money(statementSummary.totalDue)} across {statementSummary.lines.length} {statementSummary.lines.length === 1 ? 'property' : 'properties'}
+            {statementTotalKnown
+              ? `Statement · ${money(statementSummary.totalDue)} across ${statementSummary.lines.length} ${statementSummary.lines.length === 1 ? 'property' : 'properties'}`
+              : 'Statement'}
           </motion.button>
         )}
       </div>

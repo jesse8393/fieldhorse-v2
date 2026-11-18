@@ -493,6 +493,36 @@ test('the Statement button names the total the statement shows', async ({ contex
   await expect(page.locator('.fhcs-total__amount')).toHaveText('$3,114.67')
 })
 
+// formats-5: the Statement control stays one tap away while its total is
+// still loading or could not be read, and for a customer whose only balance
+// is work not yet invoiced. It names a figure only once the read is in.
+test('the Statement control stays one tap away without its total', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_invoices: [], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  // The statement's own read of invoices fails; the rest of the page loads.
+  await page.route(/\/rest\/v1\/fh_invoices\?.*status=neq\.void/, (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"message":"down"}' }))
+  await open(page, '/clients/cl-h')
+  const control = isMobile
+    ? page.getByRole('button', { name: /^Statement/ })
+    : page.locator('.fh-build-tabs__cta').filter({ hasText: /Statement/ })
+  await expect(control.first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: /^Statement · \$/ })).toHaveCount(0)
+  await control.first().click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+})
+
+test('the Statement control shows for work not yet invoiced', async ({ context, page, isMobile }) => {
+  await signIn(context, { tables: { ...FORMATS_TABLES, fh_invoices: [], fh_payments: [] } })
+  await page.clock.setFixedTime(FORMATS_NOW)
+  await open(page, '/clients/cl-h')
+  const control = isMobile
+    ? page.getByRole('button', { name: /^Statement/ })
+    : page.locator('.fh-build-tabs__cta').filter({ hasText: /Statement/ })
+  await expect(control.first()).toBeVisible({ timeout: 30_000 })
+  await control.first().click()
+  await expect(page).toHaveURL(/\/clients\/cl-h\/statement$/)
+})
+
 // formats-14: the Customers export writes each customer's last activity as
 // the local day the app shows, not the UTC day, which is already tomorrow
 // after 6 pm Central.
