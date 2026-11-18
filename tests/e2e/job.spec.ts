@@ -1045,4 +1045,24 @@ test.describe('typed words on Mark complete', () => {
     await page.reload()
     await expect(page.getByLabel('Closing note')).toHaveValue(WORDS)
   })
+
+  // Review of lost-work-12: a closeout that could not be read is not a
+  // reason to throw the closing note away.
+  test('a closing note edit is kept when the closeout cannot be read', async ({ context, page }) => {
+    const closeout = { id: 'co-1', user_id: 'qa-user-1', contact_id: 'c-job2', notes: 'Saved closing note', warranty_months: 12, warranty_start_date: '2026-10-01', signoff_method: 'verbal', signoff_name: 'Dana', created_at: '2026-10-01T15:00:00.000Z' }
+    await signIn(context, { tables: { fh_closeouts: [closeout] } })
+    await page.goto('/jobs/c-job2/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await expect(page.getByLabel('Closing note')).toHaveValue(closeout.notes)
+    await page.getByLabel('Closing note').fill(WORDS)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('fh:draft:edit:closeout:c-job2'))).not.toBeNull()
+    const refused = (route: Route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ code: 'XX000', message: 'upstream timeout' }) })
+    await context.route('**/rest/v1/fh_closeouts**', refused)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toBeVisible()
+    await page.waitForTimeout(800)
+    expect(await page.evaluate(() => localStorage.getItem('fh:draft:edit:closeout:c-job2'))).not.toBeNull()
+    await context.unroute('**/rest/v1/fh_closeouts**', refused)
+    await page.reload()
+    await expect(page.getByLabel('Closing note')).toHaveValue(WORDS)
+  })
 })

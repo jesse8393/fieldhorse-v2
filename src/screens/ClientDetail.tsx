@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -25,7 +25,7 @@ import { toastError, toastInfo } from '../lib/toast.ts'
 import { stageColor, stageLabel } from '../lib/stages.ts'
 import { recordRoute, type RecordKind } from '../lib/records.ts'
 import { useSecondTap } from '../lib/secondTap.ts'
-import { readDraftEntry } from '../lib/drafts.ts'
+import { draftWaiting } from '../lib/drafts.ts'
 import { useEditDraft } from '../lib/useEditDraft.ts'
 import DraftRestored from '../components/DraftRestored.tsx'
 import { clientDeleteBlockers, describeDeleteBlockers } from '../lib/clients.ts'
@@ -85,8 +85,12 @@ export default function ClientDetail() {
   const [tab, setTab] = useState('overview')
   // Every row on the Projects tab opens its own record (D53).
   const openRecord = (kind: RecordKind, recordId: string) => navigate(recordRoute(kind, recordId))
-  // An edit left open with changes in it opens again (D23).
-  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === 'contact' || readDraftEntry(clientEditKind(id)) != null)
+  // An edit left open with changes in it opens again (D23), when those
+  // changes began from the customer as saved now.
+  const [isEditing, setIsEditing] = useState(() => searchParams.get('edit') === 'contact')
+  useEffect(() => {
+    if (client && !isEditing && draftWaiting(clientEditKind(client.id), clientEditBase(client))) setIsEditing(true)
+  }, [client]) // eslint-disable-line react-hooks/exhaustive-deps
   // Deleting the client takes a second tap on the same button (D57).
   const deleteTap = useSecondTap()
   const [deleting, setDeleting] = useState(false)
@@ -765,10 +769,15 @@ function clientEditKind(id: string | undefined) {
   return `edit:client:${id}`
 }
 
+/** The edit form as the saved customer fills it: what an edit starts from. */
+function clientEditBase(client: any) {
+  return Object.fromEntries(CLIENT_EDITABLE.map((k) => [k, client[k] ?? null]))
+}
+
 function OverviewEdit({ client, onCommit, onCancel }: any) {
   // What is typed stays on the device until it is saved or cancelled, so a
   // reload keeps it (D23).
-  const draft = useEditDraft<Record<string, any>>(clientEditKind(client.id), Object.fromEntries(CLIENT_EDITABLE.map((k) => [k, client[k] ?? null])))
+  const draft = useEditDraft<Record<string, any>>(clientEditKind(client.id), clientEditBase(client))
   const form = draft.form
   const [saving, setSaving] = useState(false)
   function set(k: any, v: any) { draft.set(k, v) }

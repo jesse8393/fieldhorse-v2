@@ -53,7 +53,10 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
   const [signoffName, setSignoffName] = useState(contact.name || '')
   // The closing note stays on the device until the closeout is saved, so a
   // reload keeps it (D23). It starts from the closeout on file, once read.
-  const closing = useEditDraft(loading ? null : `edit:closeout:${contact.id}`, { notes: existing?.notes || '' })
+  // When the closeout could not be read, the note on file is not known, so
+  // a kept note is neither compared with a guess nor written over.
+  const [readFailed, setReadFailed] = useState(false)
+  const closing = useEditDraft(loading || readFailed ? null : `edit:closeout:${contact.id}`, { notes: existing?.notes || '' })
   const notes = closing.form.notes
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -63,11 +66,16 @@ function CompleteForm({ data, userId, goBack, home }: { data: ReturnType<typeof 
   useEffect(() => {
     let alive = true
     setLoading(true)
+    setReadFailed(false)
     void Promise.all([
-      loadCloseout({ userId, contactId: contact.id }),
+      loadCloseout({ userId, contactId: contact.id }).then(
+        (row) => ({ row, failed: false }),
+        () => ({ row: null, failed: true }),
+      ),
       snapshotJobTotals({ userId, contactId: contact.id })
-    ]).then(([row, snap]) => {
+    ]).then(([{ row, failed }, snap]) => {
       if (!alive) return
+      setReadFailed(failed)
       setExisting(row || null)
       setTotals(snap)
       if (row) {
