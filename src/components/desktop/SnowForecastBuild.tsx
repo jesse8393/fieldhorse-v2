@@ -150,15 +150,16 @@ export default function SnowForecastBuild(props: Props) {
             <MapPin size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
             {cityName || (hasCoords ? 'Pinned location' : 'No location pinned')}
           </span>
-          <span className="fh-build-vline" />
+          {/* With no location there is no weather to be unavailable. */}
+          {hasCoords && <span className="fh-build-vline" />}
           {tMax != null ? (
             <>
               <span>{Math.round(tMax)}° · {weatherLabel(current.weather_code)}</span>
               <Sun size={16} className="fh-build-sun" />
             </>
-          ) : (
+          ) : hasCoords ? (
             <span>Weather unavailable</span>
-          )}
+          ) : null}
         </div>
         <button className="fh-build-icon-btn" type="button" onClick={() => window.dispatchEvent(new CustomEvent('fh:navigate', { detail: { to: '/activity' } }))} aria-label="Open activity" title="Activity"><Bell size={16} /></button>
         <button className="fh-build-new-btn" type="button" onClick={onPinLocation}>

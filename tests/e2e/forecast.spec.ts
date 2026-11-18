@@ -90,6 +90,8 @@ test('with no location, Forecast asks for one instead of showing another town', 
   const { main, ask, asked } = await openWithNoLocation(context, page)
   await expect(main).not.toContainText('Murfreesboro')
   await expect(main).not.toContainText('Forecast unavailable')
+  // No location is not an outage.
+  await expect(page.getByText('Weather unavailable')).toHaveCount(0)
   await expect(ask.getByRole('button', { name: 'Pin location', exact: true })).toBeVisible()
   expect(asked).toEqual([])
   await ask.getByRole('link', { name: 'Set location', exact: true }).click()
