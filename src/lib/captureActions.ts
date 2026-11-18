@@ -34,10 +34,12 @@ export type CommitResult = {
   toast: string
 }
 
-export async function commitCapture({ intent, userId, contacts }: {
+export async function commitCapture({ intent, userId, contacts, paymentId }: {
   intent: CaptureIntent
   userId: string
   contacts: CaptureContact[]
+  /** The payment's id, kept by the screen for every Save of one capture, so a retry is the same payment. */
+  paymentId?: string
 }): Promise<CommitResult> {
   const job = intent.job_id ? contacts.find((c) => c.id === intent.job_id) || null : null
 
@@ -87,6 +89,7 @@ export async function commitCapture({ intent, userId, contacts }: {
       if (!job) throw new Error('Pick a job to log the payment against.')
       if (!intent.amount) throw new Error('Enter the payment amount.')
       const { error } = await logPayment(job as any, {
+        id: paymentId,
         amount: intent.amount,
         method: intent.method,
         kind: intent.payment_kind

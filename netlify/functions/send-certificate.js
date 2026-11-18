@@ -19,7 +19,7 @@ import { createClient } from '@supabase/supabase-js'
 import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
-import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
+import { formatFromHeader, renderParagraphs, textField, documentSendKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
 
 export default async (request) => {
@@ -209,7 +209,7 @@ export default async (request) => {
   const sent = await sendViaResend({
     apiKey: RESEND_API_KEY,
     payload: resendPayload,
-    key: idempotencyKey('send-certificate', `job:${contact_id}`, storage_path, normalizedEmail)
+    key: documentSendKey('send-certificate', `job:${contact_id}`, body || {}, normalizedEmail)
   })
   if (!sent.ok) {
     return json(sendFailure(sent), 502)

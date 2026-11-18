@@ -12,6 +12,7 @@ import { toCents, sumCents } from './cents.ts'
 import { todayYmd } from './dates.ts'
 import type { Database } from './database.types.ts'
 import { plainError } from './serviceErrors.ts'
+import { endSendIntent, sendIntent, sendKey } from './invoiceSends.ts'
 
 // pdf.js pulls in jspdf (~390KB). Load it lazily at call time so merely
 // importing this module (Invoices, ClientDetail, PublicDoc route graphs)
@@ -470,34 +471,47 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
 
   // One figure for the email and the PDF it attaches.
   const amountDue = invoiceAmountDue({ invoice, contact: job, payments, changeOrders, invoices })
-  const result = await buildInvoicePdf({ invoice, contact: job, client, company, payments, changeOrders, insurance, invoices, amountDue })
-  if (!result?.doc) return { ok: false, reason: 'error', message: 'The invoice PDF could not be made. Try again.' }
+  const build = () => buildInvoicePdf({ invoice, contact: job, client, company, payments, changeOrders, insurance, invoices, amountDue })
+  // One send id per send, kept for every retry until the email goes out or
+  // the invoice, its amount due or its recipient changes. A retry sends the
+  // same id and the PDF the first try uploaded, so after an unclear failure
+  // the server's provider key is the same and the customer gets one email.
+  const key = sendKey.invoice(invoice.id)
+  const intent = sendIntent(key, JSON.stringify([invoice.updated_at, recipient, amountDue]))
+  let result: any = null
+  let file = intent.upload
+  if (!file) {
+    result = await build()
+    if (!result?.doc) return { ok: false, reason: 'error', message: 'The invoice PDF could not be made. Try again.' }
 
-  const blob = result.doc.output('blob')
-  const rowId = createUuid()
-  // Under the sender's own folder either way (the server checks that); a
-  // job's PDF sits with the job's files, a client's under its invoice.
-  const path = job ? `${userId}/${job.id}/${rowId}.pdf` : `${userId}/invoices/${invoice.id}/${rowId}.pdf`
-  const { error: upErr } = await supabase.storage
-    .from('job-files')
-    .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
-  if (upErr) return { ok: false, reason: 'error', message: plainError(upErr, 'The invoice PDF could not be saved, so nothing was sent. Try again.') }
+    const blob = result.doc.output('blob')
+    const rowId = createUuid()
+    // Under the sender's own folder either way (the server checks that); a
+    // job's PDF sits with the job's files, a client's under its invoice.
+    const path = job ? `${userId}/${job.id}/${rowId}.pdf` : `${userId}/invoices/${invoice.id}/${rowId}.pdf`
+    const { error: upErr } = await supabase.storage
+      .from('job-files')
+      .upload(path, blob, { upsert: false, contentType: 'application/pdf' })
+    if (upErr) return { ok: false, reason: 'error', message: plainError(upErr, 'The invoice PDF could not be saved, so nothing was sent. Try again.') }
+    file = { path, filename: result.filename }
+    intent.upload = file
 
-  // Audit row on the job, best-effort, never blocks the send.
-  if (job) {
-    try {
-      await supabase.from('fh_job_files').insert({
-        id: rowId,
-        user_id: userId,
-        job_id: job.id,
-        filename: result.filename,
-        storage_path: path,
-        mime_type: 'application/pdf',
-        size_bytes: blob.size || 0,
-        kind: 'file'
-      })
-    } catch (e) {
-      console.warn('[invoices] fh_job_files row insert failed', e)
+    // Audit row on the job, best-effort, never blocks the send.
+    if (job) {
+      try {
+        await supabase.from('fh_job_files').insert({
+          id: rowId,
+          user_id: userId,
+          job_id: job.id,
+          filename: result.filename,
+          storage_path: path,
+          mime_type: 'application/pdf',
+          size_bytes: blob.size || 0,
+          kind: 'file'
+        })
+      } catch (e) {
+        console.warn('[invoices] fh_job_files row insert failed', e)
+      }
     }
   }
 
@@ -513,8 +527,9 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
       sender_user_id: userId,
       recipient_email: recipient,
       recipient_name: to.name || null,
-      storage_path: path,
-      filename: result.filename,
+      storage_path: file.path,
+      filename: file.filename,
+      send_id: intent.id,
       amount_due: amountDue,
       // What the email says the invoice is for, the same words as the PDF.
       description: invoiceDescription(invoice, job)
@@ -524,13 +539,15 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
 
   if (sendRes.status === 503 && sendBody?.error === 'sender_not_configured') {
     const { downloadPdf } = await loadPdf()
-    downloadPdf(result)
+    downloadPdf(result ?? await build())
     return { ok: false, reason: 'sender_not_configured' }
   }
   if (!sendRes.ok || !sendBody?.ok) {
     // The provider's words and status go to the log, not the screen (raw-errors-7).
     return { ok: false, reason: 'error', message: plainError({ ...sendBody, status: sendRes.status }, 'The invoice was not sent. Try again.') }
   }
+  // The email went out: the next send of this invoice is a new one.
+  endSendIntent(key, intent)
 
   // Don't downgrade a paid invoice just because the PDF was sent again.
   // `invoice` is the row as it was when this send started, and the email
@@ -550,7 +567,7 @@ export async function sendInvoiceEmail({ invoice, duplicateReviewed = false, con
       statusError = flipErr
     }
   }
-  return { ok: true, filename: result.filename, recipient, statusError }
+  return { ok: true, filename: file.filename, recipient, statusError }
 }
 
 // Suggested next invoice for a job, drives the new invoice screen's

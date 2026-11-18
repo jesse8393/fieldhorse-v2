@@ -67,6 +67,7 @@ import { commitCapture, refreshAfterCapture, type CaptureContact } from '../lib/
 import { pushOutbox } from '../lib/captureOutbox.ts'
 import { compressImageToDataUrl, parseExpenseFromImage } from '../lib/docIntelligence.ts'
 import { speechErrorFeedback } from '../lib/speech.ts'
+import { createUuid } from '../lib/uuid.ts'
 import './capture.css'
 import { plainError } from '../lib/serviceErrors.ts'
 
@@ -125,6 +126,11 @@ export default function Capture() {
   // Bumped on every reset, so a parse that returns after the screen was
   // left or started over does not bring its card back.
   const runRef = useRef(0)
+  // The payment's id, made once per confirmed capture and kept for every
+  // Save of it, as the payment screens keep theirs (DATA-15). A Save whose
+  // answer was lost is tried again with the same id, so the upsert finds
+  // the first row instead of recording the payment twice.
+  const paymentIdRef = useRef(createUuid())
   const ids = useId()
   const titleRef = useRef<HTMLHeadingElement>(null)
   // Back with words not saved yet asks with a second tap (D57).
@@ -243,6 +249,7 @@ export default function Capture() {
       setAccessNotice('')
     }
     setIntent(next)
+    paymentIdRef.current = createUuid()
     setAmountDraft(null)
     setEditing((next.kind === 'payment' || next.kind === 'expense') && !next.amount)
     setChoosingJob(next.kind === 'payment' && !next.job_id)
@@ -384,7 +391,7 @@ export default function Capture() {
     }
     setPhase('saving')
     try {
-      const result = await commitCapture({ intent: it, userId: user.id, contacts: roster })
+      const result = await commitCapture({ intent: it, userId: user.id, contacts: roster, paymentId: paymentIdRef.current })
       void refreshAfterCapture(queryClient, user.id, it.job_id ?? null)
       hapticSuccess()
       toastSuccess(result.toast, it.summary)

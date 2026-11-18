@@ -136,3 +136,44 @@ describe('sendInvoiceEmail tells the email what the invoice is for', () => {
     expect(posted().description).toBe('Concrete steps')
   })
 })
+
+// A send that did not go out keeps its send id and its uploaded PDF for
+// every retry, so the server's provider key is the same and the customer
+// gets one email; a send that went out ends it (double-tap-3).
+describe('sendInvoiceEmail repeats a send that did not go out', () => {
+  function bodies() {
+    return vi.mocked(fetch).mock.calls.map(([, init]) => JSON.parse(String((init as RequestInit).body)))
+  }
+
+  it('sends the same id and PDF on a retry, and a new id once it went out', async () => {
+    const notSaved = { error: 'status_not_saved', email_sent: true, message: 'The invoice was sent, but it could not be marked as sent.' }
+    const answers = [
+      new Response(JSON.stringify(notSaved), { status: 500 }),
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    ]
+    vi.stubGlobal('fetch', vi.fn(async () => answers.shift()!))
+    const invoice = { ...invoiceRow('sent', '2026-09-28T12:00:00Z'), id: 'i-retry' }
+    stored = [{ ...invoice }]
+    const args = { invoice, contact, company, userId: 'u-1', recipientEmail: 'rosa@example.com' }
+    expect((await sendInvoiceEmail(args)).ok).toBe(false)
+    expect((await sendInvoiceEmail(args)).ok).toBe(true)
+    expect((await sendInvoiceEmail(args)).ok).toBe(true)
+    const [first, retry, next] = bodies()
+    expect(first.send_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(retry.send_id).toBe(first.send_id)
+    expect(retry.storage_path).toBe(first.storage_path)
+    expect(next.send_id).not.toBe(first.send_id)
+    expect(next.storage_path).not.toBe(first.storage_path)
+  })
+
+  it('starts a new send when the invoice changed', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'send_failed' }), { status: 502 })))
+    const invoice = { ...invoiceRow('sent', '2026-09-28T12:00:00Z'), id: 'i-edited' }
+    stored = [{ ...invoice }]
+    await sendInvoiceEmail({ invoice, contact, company, userId: 'u-1', recipientEmail: 'rosa@example.com' })
+    await sendInvoiceEmail({ invoice: { ...invoice, updated_at: '2026-09-29T12:00:00Z' }, contact, company, userId: 'u-1', recipientEmail: 'rosa@example.com' })
+    const [first, edited] = bodies()
+    expect(edited.send_id).not.toBe(first.send_id)
+  })
+})

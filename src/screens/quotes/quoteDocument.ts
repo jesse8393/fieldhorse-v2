@@ -14,6 +14,7 @@ import { proposalIssuedAt } from '../../lib/proposalDate.ts'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { mintPublicLink } from '../../lib/publicLink.ts'
 import { quoteFollowUpDate } from '../../lib/quoteFollowUp.ts'
+import { endSendIntent, sendIntent, sendKey } from '../../lib/invoiceSends.ts'
 import { loadProjectPhotosForPdf } from '../ContactDetail/sections/DocumentPreviewPane.tsx'
 import { quoteAsContact, type QuoteWithClient } from './quoteShape.ts'
 import { plainError } from '../../lib/serviceErrors.ts'
@@ -73,17 +74,22 @@ export class NoLinesError extends Error {
   constructor() { super('Add at least one line in the total before building the quote.') }
 }
 
-/** Reads the lines and builds the proposal PDF. Throws NoLinesError with no base line. */
-export async function buildQuotePdf({ quote, company, userId, recipientEmail, insurance = null }: BuildInput) {
-  const { generateQuote } = await loadPdf()
+/** The quote's lines, read fresh, in their order. */
+async function readQuoteItems(quoteId: string): Promise<any[]> {
   const { data, error } = await supabase
     .from('fh_quote_items')
     .select('*')
-    .eq('quote_id', quote.id)
+    .eq('quote_id', quoteId)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
-  const items: any[] = data || []
+  return data || []
+}
+
+/** Reads the lines (unless given) and builds the proposal PDF. Throws NoLinesError with no base line. */
+export async function buildQuotePdf({ quote, company, userId, recipientEmail, insurance = null }: BuildInput, lines?: any[]) {
+  const { generateQuote } = await loadPdf()
+  const items: any[] = lines ?? await readQuoteItems(quote.id)
   if (items.filter((i) => !i.is_optional && !i.is_excluded).length === 0) throw new NoLinesError()
 
   // Photos for the cover and the scope sections, from the job the quote came
@@ -153,12 +159,26 @@ async function uploadQuotePdf(quote: QuoteWithClient, userId: string, result: an
 
 export type SendOutcome = { kind: 'sent' } | { kind: 'sender_not_configured'; result: any }
 
-/** Builds the PDF, saves it and asks the server to email it. */
+/**
+ * Builds the PDF, saves it and asks the server to email it. One send id
+ * per send, kept for every retry until the email goes out or the quote,
+ * its lines or its recipient change: a retry sends the same id and the PDF
+ * the first try uploaded, so after an unclear failure the server's
+ * provider key is the same and the customer gets one email.
+ */
 export async function sendQuoteByEmail(input: BuildInput & { preferences: unknown }): Promise<SendOutcome> {
   const { quote, userId, recipientEmail } = input
   if (!recipientEmail) throw new Error('Add a client email first so we know where to send.')
-  const result = await buildQuotePdf(input)
-  const path = await uploadQuotePdf(quote, userId, result)
+  const items = await readQuoteItems(quote.id)
+  const key = sendKey.quote(quote.id)
+  const intent = sendIntent(key, JSON.stringify([quote.updated_at, quote.scope_text, quote.terms_text, quote.exclusions_text, quote.expires_at, recipientEmail, items]))
+  let result: any = null
+  let file = intent.upload
+  if (!file) {
+    result = await buildQuotePdf(input, items)
+    file = { path: await uploadQuotePdf(quote, userId, result), filename: result.filename }
+    intent.upload = file
+  }
   const res = await fetch('/api/send-quote', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
@@ -168,14 +188,16 @@ export async function sendQuoteByEmail(input: BuildInput & { preferences: unknow
       sender_user_id: userId,
       recipient_email: recipientEmail,
       recipient_name: quote.fh_clients?.name || null,
-      storage_path: path,
-      filename: result.filename,
+      storage_path: file.path,
+      filename: file.filename,
+      send_id: intent.id,
       follow_up_on: quoteFollowUpDate(input.preferences)
     })
   })
   const body = await res.json().catch(() => ({}))
-  if (res.status === 503 && body?.error === 'sender_not_configured') return { kind: 'sender_not_configured', result }
+  if (res.status === 503 && body?.error === 'sender_not_configured') return { kind: 'sender_not_configured', result: result ?? await buildQuotePdf(input, items) }
   if (!res.ok || !body?.ok) throw new Error(plainError({ ...body, status: res.status }, 'The proposal was not sent. Try again.'))
+  endSendIntent(key, intent)
   return { kind: 'sent' }
 }
 

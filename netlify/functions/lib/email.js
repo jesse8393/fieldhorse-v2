@@ -33,6 +33,25 @@ export function idempotencyKey(kind, ...parts) {
   return `${kind}/${digest}`
 }
 
+// The send id a screen makes once per send and keeps for every retry of it
+// (src/lib/invoiceSends.ts sendIntent). Only a plain id is taken; anything
+// else reads as none.
+export function sendIdField(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(value) ? value : ''
+}
+
+// The idempotency key for a document email (an invoice, a proposal, a
+// statement, a certificate). With a send id, the key follows the send: a
+// retry of it, with the PDF built and uploaded again or not, is the same
+// key, and the provider drops the repeat, so the customer gets one email
+// however often "Try again" is tapped after an unclear failure. A new send
+// gets a new id and goes out. Without one, an older screen's request is
+// keyed by the attachment path, as before.
+export function documentSendKey(kind, record, { send_id, storage_path } = {}, normalizedEmail = '') {
+  const sendId = sendIdField(send_id)
+  return idempotencyKey(kind, record, sendId ? `send:${sendId}` : storage_path, normalizedEmail)
+}
+
 // POST one email to Resend with an idempotency key and a time limit. Never
 // throws: a network error or a timeout comes back as { ok: false,
 // status: 0 } with a plain detail, so the handler answers JSON instead of

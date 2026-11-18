@@ -7,7 +7,7 @@
 //
 // Browser hits POST /api/send-statement with:
 //   { client_id, sender_user_id, recipient_email, recipient_name?,
-//     storage_path, filename, total_due? }
+//     storage_path, filename, total_due?, send_id? }
 //
 // White-label sender policy matches send-invoice / send-message:
 //   From:     `${Company Name} <notifications@fieldhorse.io>`
@@ -15,7 +15,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { supabaseServiceConfig } from './lib/serviceConfig.js'
-import { renderPayBlock, formatFromHeader, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
+import { renderPayBlock, formatFromHeader, textField, documentSendKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
@@ -184,7 +184,7 @@ export default async (request) => {
   const sent = await sendViaResend({
     apiKey: RESEND_API_KEY,
     payload: resendPayload,
-    key: idempotencyKey('send-statement', `client:${client_id}`, storage_path, normalizedEmail)
+    key: documentSendKey('send-statement', `client:${client_id}`, payload || {}, normalizedEmail)
   })
   if (!sent.ok) return json(sendFailure(sent), 502)
 

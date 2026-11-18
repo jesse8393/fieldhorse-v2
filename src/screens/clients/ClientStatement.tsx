@@ -23,6 +23,7 @@ import { mintPublicLink, listClientStatementLinks, buildPublicUrl } from '../../
 import { toast, toastSuccess, toastInfo } from '../../lib/toast.ts'
 import { moneyExact } from '../../lib/format.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { sendKey, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
 import { recordRoute } from '../../lib/records.ts'
 import './client-statement.css'
 import { plainError } from '../../lib/serviceErrors.ts'
@@ -38,6 +39,10 @@ export default function ClientStatement() {
   const { data: bundle, isPending: loading, isError, refetch } = useClientDetail(id, user?.id)
   const client = bundle?.client ?? null
   const [busy, setBusy] = useState<null | 'download' | 'email' | 'link'>(null)
+  // The email is kept app wide (lib/invoiceSends), not in this screen:
+  // leave the statement while it is still going out and come back, and it
+  // is still busy.
+  const emailOut = useSendInFlight(id ? sendKey.statement(id) : null)
   const titleRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => { titleRef.current?.focus({ preventScroll: true }) }, [])
@@ -88,10 +93,14 @@ export default function ClientStatement() {
   }
 
   async function handleEmail() {
-    if (!data || busy || !client || !user?.id) return
+    if (!data || busy || emailOut || !client || !user?.id) return
+    const end = startSend(sendKey.statement(client.id))
+    if (!end) return
+    let sent = false
     setBusy('email')
     try {
       const res = await sendStatementEmail({ company: await loadCompany(), client, data, userId: user.id, recipientEmail })
+      sent = res.ok
       if (res.ok) {
         toastSuccess(`Statement sent to ${res.recipient}`, `${money(data.totalDue)} due`)
         goBack()
@@ -104,6 +113,7 @@ export default function ClientStatement() {
         toast("Couldn't send the statement", { description: res.message || 'The statement was not sent. Try again.' })
       }
     } finally {
+      end(sent)
       setBusy(null)
     }
   }
@@ -205,7 +215,7 @@ export default function ClientStatement() {
                   variant="primary"
                   size="lg"
                   onClick={handleEmail}
-                  loading={busy === 'email'}
+                  loading={busy === 'email' || emailOut}
                   disabled={!!busy && busy !== 'email'}
                   title={recipientEmail ? `Email to ${recipientEmail}` : 'No client email on file'}
                 >

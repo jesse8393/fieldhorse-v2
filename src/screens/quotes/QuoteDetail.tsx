@@ -30,6 +30,7 @@ import { invalidateAfterQuoteWrite, makeJobFromQuote, plainQuoteError, quoteNumb
 import { recordRoute } from '../../lib/records.ts'
 import { buildQuoteView, previewAsLabel, previewAsName, quoteCapsule } from '../../lib/quoteView.ts'
 import { hapticTap } from '../../lib/haptics.ts'
+import { sendKey, startSend, useSendInFlight } from '../../lib/invoiceSends.ts'
 import { toastError, toastSuccess } from '../../lib/toast.ts'
 import { useQuoteItems } from '../ContactDetail/sections/QuoteItems.tsx'
 import { shortDate, statusChip } from '../ContactDetail/lib/quoteStatus.ts'
@@ -213,10 +214,15 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   const [busy, setBusy] = useState<Busy>(null)
   // The same busy flag, read at once: two taps in one frame both saw null.
   const busyRef = useRef<Busy>(null)
+  // The proposal email and the signature request are kept app wide
+  // (lib/invoiceSends), not in this screen: leave the quote while one is
+  // still going out and come back, and it is still busy.
+  const emailOut = useSendInFlight(sendKey.quote(quote.id))
+  const esignOut = useSendInFlight(sendKey.quoteSignature(quote.id))
   // A line still being added is not in the database the document, the
   // approval and the job are built from, so they all wait for it.
   const lineSaving = Boolean(lines.lineSaving)
-  const waiting = items.loading || busy !== null || lines.switchSaving || lineSaving
+  const waiting = items.loading || busy !== null || emailOut || esignOut || lines.switchSaving || lineSaving
   const needsLines = !items.loading && !live.canSend
   const linesLine = linesFailed ? LINES_FAILED : NEEDS_A_LINE
   const sendHint = lost
@@ -245,7 +251,14 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }
 
   const onSend = () => run('send', async () => {
-    const outcome = await sendQuoteByEmail({ quote, company: await loadCompany(), userId: userId as string, recipientEmail, preferences: profile?.preferences })
+    const end = startSend(sendKey.quote(quote.id))
+    if (!end) return
+    let outcome
+    try {
+      outcome = await sendQuoteByEmail({ quote, company: await loadCompany(), userId: userId as string, recipientEmail, preferences: profile?.preferences })
+    } finally {
+      end(outcome?.kind === 'sent')
+    }
     if (outcome.kind === 'sender_not_configured') {
       toastError("Email not sent, sender isn't configured", 'Downloaded the PDF so you can email it manually.')
       await downloadQuotePdf(outcome.result)
@@ -325,7 +338,14 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
   }, "Couldn't download")
 
   const onEsign = () => run('esign', async () => {
-    const outcome = await sendQuoteForSignature({ quote, company: await loadCompany(), userId: userId as string, recipientEmail })
+    const end = startSend(sendKey.quoteSignature(quote.id))
+    if (!end) return
+    let outcome
+    try {
+      outcome = await sendQuoteForSignature({ quote, company: await loadCompany(), userId: userId as string, recipientEmail })
+    } finally {
+      end(outcome === 'sent')
+    }
     if (outcome === 'esign_not_configured') {
       toastError('E-signature is not set up yet', 'Send the quote link instead.')
       return
@@ -515,7 +535,7 @@ function QuoteScreen({ quote, refresh }: ScreenProps) {
           size="lg"
           block
           disabled={waiting || lost || !live.canSend || !emailKnown}
-          loading={busy === 'send' || busy === 'share'}
+          loading={busy === 'send' || busy === 'share' || emailOut}
           onClick={hasEmail ? onSend : onShare}
         >
           {sendLabel}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ClipboardCheck, CheckCircle2, XCircle, MinusCircle } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
@@ -190,11 +190,22 @@ export default function InspectionsSection({ contact, inspections = [], userId, 
 function InspectionLog({ trade, onCancel, onSave }: { trade: string; onCancel: () => void; onSave: (trade: string, result: string, notes: string) => void | Promise<void> }) {
   const [result, setResult] = useState('pass')
   const [notes, setNotes] = useState('')
+  // A second Save while the first is still out logged the result twice.
+  // The ref is read at once; the state shows Save as working.
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+
+  async function save() {
+    if (savingRef.current) return
+    savingRef.current = true
+    setSaving(true)
+    try { await onSave(trade, result, notes) } finally { savingRef.current = false; setSaving(false) }
+  }
 
   return (
     <form
       aria-label={`Log ${trade}`}
-      onSubmit={(e) => { e.preventDefault(); void onSave(trade, result, notes) }}
+      onSubmit={(e) => { e.preventDefault(); void save() }}
       style={{
         display: 'flex', flexDirection: 'column', gap: 12,
         padding: 16, borderRadius: 10,
@@ -254,7 +265,7 @@ function InspectionLog({ trade, onCancel, onSave }: { trade: string; onCancel: (
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <Button type="button" variant="quiet" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" variant="secondary">Save</Button>
+        <Button type="submit" variant="secondary" loading={saving}>Save</Button>
       </div>
     </form>
   )

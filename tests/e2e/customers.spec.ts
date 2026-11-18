@@ -9,6 +9,7 @@ import { signIn } from './helpers/signIn.ts'
 import { isReadOnlyRpc } from './helpers/readRpc.ts'
 import { contrastOf, textContrastAgainst } from './helpers/contrast.ts'
 import { USER } from '../../scripts/qa-mock.mjs'
+import { goInApp, holdPosts, postsTo } from './helpers/doubleTap.ts'
 
 const NOW = Date.now()
 const DAY = 86400000
@@ -443,3 +444,31 @@ for (const mode of ['day', 'night'] as const) {
     await expect.poll(() => textContrastAgainst(button, ['var(--v3-primary-hot)', 'var(--v3-primary)'])).toBeGreaterThanOrEqual(4.5)
   })
 }
+
+// Email statement kept its busy state on the statement screen. Leave it
+// while the email is still going out and come back, and the button was
+// free again: one more tap emailed the statement twice. The send is now
+// kept app wide, so the statement is busy until it lands.
+test('leaving the statement while it emails and coming back does not email it twice', async ({ context, page }) => {
+  await signIn(context)
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '{"Key":"job-files/statement.pdf"}' }))
+  const sends = postsTo(context, '/api/send-statement')
+  await holdPosts(context, '**/api/send-statement', 6000, () => ({ status: 200, json: { ok: true } }))
+  await open(page, '/clients/cl-1/statement')
+  const email = page.getByRole('button', { name: 'Email statement' })
+  await expect(email).toBeEnabled({ timeout: 30_000 })
+  await email.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  await goInApp(page, '/clients/cl-1')
+  await page.waitForTimeout(800)
+  await goInApp(page, '/clients/cl-1/statement')
+  const again = page.getByRole('button', { name: 'Email statement' })
+  await expect(again).toBeVisible({ timeout: 30_000 })
+  // Once the screen has read what it needs, the button takes a tap or says it is busy.
+  await expect.poll(async () => await again.isEnabled() || await again.getAttribute('aria-busy') === 'true', { timeout: 30_000 }).toBe(true)
+  const busy = await again.getAttribute('aria-busy')
+  await again.click({ force: true })
+  await page.waitForTimeout(1500)
+  expect(sends.length, 'one statement, one email').toBe(1)
+  expect(busy, 'Email statement shows the email going out').toBe('true')
+})

@@ -7,6 +7,7 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 import { contrastOf } from './helpers/contrast.ts'
 import { FAIL, expectPlain } from './helpers/rawErrors.ts'
+import { goInApp, holdPosts, postsTo, twoTaps } from './helpers/doubleTap.ts'
 
 async function open(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
@@ -896,4 +897,113 @@ test('the contract card shows cents', async ({ context, page }) => {
   await expect(card.locator('.cockpit-headline__amt')).toHaveText('$10,000')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$5,000.50 collected')
   await expect(card.locator('.cockpit-headline__bar-meta')).toContainText('$4,999.50 remaining')
+})
+
+// A double tap while the write is still out wrote twice: two lines for one
+// material, the bulk list twice, two inspection results for one visit. Each
+// add or save now takes no second tap until the first settles.
+test.describe('one tap writes once on the job sections', () => {
+  test.beforeEach(async ({ page: _page }, testInfo) => {
+    test.skip(!testInfo.project.name.startsWith('mobile'), 'touch taps')
+  })
+
+  test('Add material sends one row', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_materials: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const name = page.getByLabel('Material name')
+    await expect(name).toBeVisible({ timeout: 30_000 })
+    await name.fill('2x4 studs')
+    await twoTaps(page, page.getByRole('button', { name: 'Add material' }))
+    await expect(page.getByText('Added', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one material').toBe(1)
+  })
+
+  test('Bulk add sends the list once', async ({ context, page }) => {
+    await signIn(context, { tables: { fh_materials: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const bulk = page.getByRole('button', { name: /Bulk add/ })
+    await expect(bulk).toBeVisible({ timeout: 30_000 })
+    await bulk.click()
+    await page.getByLabel('Materials to add, one per line').fill('4 of 2x4 studs\n1 box of #10 screws\nDrywall mud (3)')
+    await twoTaps(page, page.getByRole('button', { name: 'Add 3', exact: true }))
+    await expect(page.getByText('Added 3 items', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one bulk insert').toBe(1)
+  })
+
+  test('Pull from notes adds the picked materials once', async ({ context, page }) => {
+    const note = { id: 'n-mat', user_id: 'qa-user-1', contact_id: 'c-job1', text: 'Need studs', category: 'note', created_at: '2026-11-10T15:00:00.000Z', parsed: { materials_needed: ['4 of 2x4 studs', 'Drywall mud (3)'] } }
+    await signIn(context, { tables: { fh_materials: [], fh_notes: [note] } })
+    const posts = postsTo(context, '/rest/v1/fh_materials')
+    await holdPosts(context, '**/rest/v1/fh_materials*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=materials', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const pull = page.getByRole('button', { name: /Pull from notes/ })
+    await expect(pull).toBeVisible({ timeout: 30_000 })
+    await pull.click()
+    const add = page.getByRole('button', { name: 'Add 2', exact: true })
+    await expect(add).toBeEnabled({ timeout: 10_000 })
+    await twoTaps(page, add)
+    await expect(page.getByText('Added 2', { exact: true }).first()).toBeVisible({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one insert').toBe(1)
+  })
+
+  test('Save on an inspection logs one result', async ({ context, page }) => {
+    const job = {
+      id: 'c-job1', stage: 'job', name: 'Plumbing Bellevue', job_title: 'Slab + trench', amount: 33100,
+      user_id: 'qa-user-1', client_id: null, phone: '555-0101', email: 'x@y.com', address: '412 Burkitt Station Rd',
+      created_at: '2026-09-20T15:00:00.000Z', updated_at: '2026-10-09T15:00:00.000Z', completed_at: null,
+      proposal_status: null, milestones: [], follow_up_on: null, notes: null, scope_text: null, has_inspections: true
+    }
+    await signIn(context, { tables: { fh_contacts: [job], fh_inspections: [] } })
+    const posts = postsTo(context, '/rest/v1/fh_inspections')
+    await holdPosts(context, '**/rest/v1/fh_inspections*', 1500, () => ({ status: 201, json: [] }))
+    await page.goto('/jobs/c-job1?tab=inspections', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    const trade = page.getByRole('button', { name: /^Concrete/ }).first()
+    await expect(trade).toBeVisible({ timeout: 30_000 })
+    await trade.click()
+    const form = page.locator('form[aria-label="Log Concrete"]')
+    await expect(form).toBeVisible()
+    await twoTaps(page, form.getByRole('button', { name: 'Save' }))
+    await expect(form).toHaveCount(0, { timeout: 10_000 })
+    await page.waitForTimeout(500)
+    expect(posts.length, 'one tap, one inspection').toBe(1)
+  })
+})
+
+// Send certificate kept its busy state on the closeout screen. Leave it
+// while the email is still going out and come back, and the button was
+// free again: one more tap emailed the completion certificate twice. The
+// send is now kept app wide, so the certificate is busy until it lands.
+test('leaving the closeout while the certificate emails and coming back does not email it twice', async ({ context, page }) => {
+  const closeout = {
+    id: 'co1', user_id: 'qa-user-1', contact_id: 'c-done', warranty_start_date: '2026-09-20', warranty_months: 12,
+    signoff_method: 'verbal', signoff_name: 'Danielle Ortiz', notes: 'Walkthrough done.', final_amount: 9600, created_at: '2026-10-28T15:00:00.000Z'
+  }
+  await signIn(context, { tables: { fh_closeouts: [closeout] } })
+  await context.route('**/storage/v1/object/**', (route) => route.fulfill({ status: 200, json: { Key: 'job-files/certificate.pdf' } }))
+  const sends = postsTo(context, '/api/send-certificate')
+  await holdPosts(context, '**/api/send-certificate', 6000, () => ({ status: 200, json: { ok: true } }))
+  await page.goto('/jobs/c-done/complete', { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const send = page.getByRole('button', { name: 'Send certificate' })
+  await expect(send).toBeEnabled({ timeout: 30_000 })
+  await send.click()
+  await expect.poll(() => sends.length, { timeout: 30_000 }).toBe(1)
+  await goInApp(page, '/jobs/c-done')
+  await page.waitForTimeout(800)
+  await goInApp(page, '/jobs/c-done/complete')
+  const again = page.getByRole('button', { name: 'Send certificate' })
+  await expect(again).toBeVisible({ timeout: 30_000 })
+  // Once the screen has read what it needs, the button takes a tap or says it is busy.
+  await expect.poll(async () => await again.isEnabled() || await again.getAttribute('aria-busy') === 'true', { timeout: 30_000 }).toBe(true)
+  const busy = await again.getAttribute('aria-busy')
+  await again.click({ force: true })
+  await page.waitForTimeout(1500)
+  expect(sends.length, 'one certificate, one email').toBe(1)
+  expect(busy, 'Send certificate shows the email going out').toBe('true')
 })

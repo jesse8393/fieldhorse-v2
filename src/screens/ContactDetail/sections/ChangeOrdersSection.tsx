@@ -12,10 +12,11 @@
 // summary, the math lives in InvoiceTemplate; this surface only
 // captures + manages the data.
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Plus, FileEdit, Check, X, Trash2, FileText, Share2 } from 'lucide-react'
 import { supabase } from '../../../lib/supabase.ts'
 import { mintPublicLink } from '../../../lib/publicLink.ts'
+import { sendKey, startSend, useSendsInFlight } from '../../../lib/invoiceSends.ts'
 import { toastSuccess, toastError } from '../../../lib/toast.ts'
 import { useArmedId } from '../../../lib/secondTap.ts'
 import { Eyebrow } from '../../../components/v3'
@@ -48,6 +49,14 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
   })
   const [editingId, setEditingId] = useState<any>(null)
   const [creating, setCreating] = useState(false)
+  // One tap, one write. A double tap on Send for signature minted two live
+  // approval links, and on Approve wrote the change order twice. The link
+  // is kept in the app wide list of sends (lib/invoiceSends), so it stays
+  // busy after leaving the tab; Approve is kept here. Both are read and
+  // set at once, so a second tap in the same frame does nothing.
+  const sends = useSendsInFlight()
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const approvingRef = useRef<string | null>(null)
 
   if (!isOwner) {
     // Read only for everyone but the job's creator. RLS decides what is
@@ -131,12 +140,20 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
   }
 
   async function handleApprove(co: any) {
-    return handleSave({
-      ...co,
-      status: 'approved',
-      approval_method: co.approval_method || 'verbal',
-      approved_at: co.approved_at || new Date().toISOString()
-    })
+    if (approvingRef.current) return false
+    approvingRef.current = co.id
+    setApprovingId(co.id)
+    try {
+      return await handleSave({
+        ...co,
+        status: 'approved',
+        approval_method: co.approval_method || 'verbal',
+        approved_at: co.approved_at || new Date().toISOString()
+      })
+    } finally {
+      approvingRef.current = null
+      setApprovingId(null)
+    }
   }
 
   // Mint a public approval link for this CO, flip it to 'sent', and
@@ -145,6 +162,9 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
   // lands back here via realtime/refresh and folds into the next
   // invoice through contractTotals().
   async function handleGetSignature(co: any) {
+    const end = startSend(sendKey.changeOrderSignature(co.id))
+    if (!end) return
+    let minted = false
     try {
       const link = await mintPublicLink({
         contactId: contact?.id || co.contact_id,
@@ -152,6 +172,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         kind: 'change_order',
         changeOrderId: co.id
       })
+      minted = true
       if (co.status === 'draft') {
         // By id: anyone who may edit the job's money may send a teammate's
         // change order, and row security decides. A write that matched no
@@ -183,6 +204,8 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
       toastSuccess('Approval link copied', 'Text it to the customer, they sign right on the page')
     } catch (e: any) {
       toastError("Couldn't create approval link", plainError(e, 'Try again.'))
+    } finally {
+      end(minted)
     }
   }
 
@@ -243,6 +266,7 @@ export default function ChangeOrdersSection({ contact, userId, changeOrders = []
         onVoid={handleVoid}
         onDelete={handleDelete}
         armedKey={armedTap.armedId}
+        isBusy={(id: string) => id === approvingId || sends.has(sendKey.changeOrderSignature(id))}
       />
     </SectionShell>
   )
@@ -304,7 +328,7 @@ function SectionHeader({ count, canAdd, onAdd }: any) {
   )
 }
 
-function List({ changeOrders, editingId, readOnly, armedKey, onEdit, onCancelEdit, onSave, onApprove, onGetSignature, onVoid, onDelete }: any) {
+function List({ changeOrders, editingId, readOnly, armedKey, isBusy, onEdit, onCancelEdit, onSave, onApprove, onGetSignature, onVoid, onDelete }: any) {
   if (!changeOrders.length) {
     return (
       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--v3-text-muted)', fontSize: 12, fontFamily: 'var(--font-body)' }}>
@@ -327,6 +351,7 @@ function List({ changeOrders, editingId, readOnly, armedKey, onEdit, onCancelEdi
             <Row
               co={co}
               readOnly={readOnly}
+              busy={!!isBusy?.(co.id)}
               onEdit={() => onEdit?.(co.id)}
               onApprove={() => onApprove?.(co)}
               onGetSignature={() => onGetSignature?.(co)}
@@ -342,7 +367,7 @@ function List({ changeOrders, editingId, readOnly, armedKey, onEdit, onCancelEdi
   )
 }
 
-function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
+function Row({ co, readOnly, busy = false, onEdit, onApprove, onGetSignature, onVoid, onDelete, voidArmed = false, deleteArmed = false }: any) {
   const isApproved = co.status === 'approved'
   const isVoid = co.status === 'void'
   const isDraft = co.status === 'draft'
@@ -392,12 +417,12 @@ function Row({ co, readOnly, onEdit, onApprove, onGetSignature, onVoid, onDelete
         {!readOnly && (
           <div style={{ display: 'flex', gap: 4 }}>
             {!isApproved && !isVoid && (
-              <IconBtn onClick={onGetSignature} aria-label="Send for signature" title="Get signature">
+              <IconBtn onClick={onGetSignature} disabled={busy} aria-busy={busy || undefined} aria-label="Send for signature" title="Get signature">
                 <Share2 size={12} aria-hidden="true" />
               </IconBtn>
             )}
             {!isApproved && !isVoid && (
-              <IconBtn onClick={onApprove} aria-label="Approve change order" title="Mark approved (verbal)">
+              <IconBtn onClick={onApprove} disabled={busy} aria-busy={busy || undefined} aria-label="Approve change order" title="Mark approved (verbal)">
                 <Check size={12} aria-hidden="true" />
               </IconBtn>
             )}
@@ -607,7 +632,8 @@ function IconBtn({ children, onClick, tone, title, wide = false, ...rest }: any)
         background: 'transparent',
         border: `1px solid ${danger ? 'rgba(192, 57, 43, 0.35)' : 'var(--v3-border-strong)'}`,
         color: danger ? 'var(--v3-danger-text)' : 'var(--v3-text)',
-        cursor: 'pointer'
+        cursor: rest.disabled ? 'wait' : 'pointer',
+        opacity: rest.disabled ? 0.55 : 1
       }}
     >
       {children}

@@ -38,7 +38,7 @@ import { supabaseServiceConfig } from './lib/serviceConfig.js'
 import crypto from 'node:crypto'
 import { loadAccessibleRow, brandingUserIdFor } from './lib/orgAccess.js'
 import { hashIdentifier, checkRateLimit, checkDailySendCap, DAILY_SEND_LIMIT_MESSAGE } from './lib/rateLimit.js'
-import { formatFromHeader, renderParagraphs, textField, idempotencyKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
+import { formatFromHeader, renderParagraphs, textField, documentSendKey, sendViaResend, sendFailure, greetingFor, EMAIL_HEAD } from './lib/email.js'
 import { isOwnedStoragePath } from './lib/storagePath.js'
 
 export default async (request) => {
@@ -264,7 +264,7 @@ export default async (request) => {
   const sent = await sendViaResend({
     apiKey: RESEND_API_KEY,
     payload: resendPayload,
-    key: idempotencyKey('send-quote', isQuote ? `quote:${quote_id}` : `job:${contact_id}`, storage_path, normalizedEmail)
+    key: documentSendKey('send-quote', isQuote ? `quote:${quote_id}` : `job:${contact_id}`, body || {}, normalizedEmail)
   })
   if (!sent.ok) {
     // Do NOT update quote_sent_at / proposal_status. Sending failed.
