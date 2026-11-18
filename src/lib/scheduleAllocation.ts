@@ -47,9 +47,27 @@ export function allocationConflicts(visits: VisitWindow[], userIds: string[], ev
  */
 export class CrewAssignmentUnavailableError extends Error {}
 
+// Set by the first answer that the crew columns are missing. A database
+// does not grow them while the app is open, so later reads are not sent:
+// each one would only fail again and log a 400 on every date or time
+// change. A reload asks again, so the picker returns once the migration
+// is applied.
+let crewColumnsMissing = false
+
+/** Forget that the crew columns were missing, so the next read asks again. */
+export function forgetMissingCrewColumns() {
+  crewColumnsMissing = false
+}
+
+function missingCrewColumn(error: { code?: string; message?: string }) {
+  if (error.code === '42703' || error.code === 'PGRST204') return true
+  return /assigned_user_ids/.test(error.message || '') && /does not exist|could not find/i.test(error.message || '')
+}
+
 /** Read every relevant event, including long visits that start before this range. */
 export async function fetchAllocationEvents(orgId: string, visits: VisitWindow[]): Promise<AllocationEvent[]> {
   if (!visits.length) return []
+  if (crewColumnsMissing) throw new CrewAssignmentUnavailableError('Crew assignment is not available yet.')
   const from = visits.reduce((a, v) => a < v.start_at ? a : v.start_at, visits[0].start_at)
   const to = visits.reduce((a, v) => a > v.end_at ? a : v.end_at, visits[0].end_at)
   const rows: AllocationEvent[] = []
@@ -61,7 +79,10 @@ export async function fetchAllocationEvents(orgId: string, visits: VisitWindow[]
       .or(`end_at.gt.${from},end_at.is.null`)
       .order('start_at', { ascending: true }).order('id', { ascending: true })
       .range(offset, offset + pageSize - 1)
-    if (error?.code === '42703') throw new CrewAssignmentUnavailableError('Crew assignment is not available yet.')
+    if (error && missingCrewColumn(error)) {
+      crewColumnsMissing = true
+      throw new CrewAssignmentUnavailableError('Crew assignment is not available yet.')
+    }
     if (error) throw new Error('Crew availability could not be checked. Try again before assigning anyone.')
     const page = (data ?? []) as AllocationEvent[]
     rows.push(...page)

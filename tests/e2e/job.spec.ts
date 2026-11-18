@@ -922,6 +922,47 @@ test('a job page reads its to-dos and photos once each', async ({ context, page 
   expect(reads.filter(read => read === 'photos')).toHaveLength(1)
 })
 
+// A job opened straight on its Tasks, Contract balance or Invoices tab (a
+// link or a reload) read the same rows twice: the tab's own read came on
+// top of the job's (vibe audit console-2). One read each now feeds both.
+test.describe('a job opened on a tab reads each table once', () => {
+  async function countReads(page: Page, path: string) {
+    const reads: Record<string, number> = {}
+    page.on('request', (request) => {
+      if (request.method() !== 'GET') return
+      const url = new URL(request.url())
+      const table = url.pathname.split('/rest/v1/')[1]
+      if (!table || (url.searchParams.get('contact_id') ?? url.searchParams.get('job_id')) !== 'eq.c-job1') return
+      // Whole rows only: the desktop job panel's short list of invoice
+      // numbers and dates is a read of its own.
+      if (url.searchParams.get('select') !== '*') return
+      reads[table] = (reads[table] ?? 0) + 1
+    })
+    await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.waitForLoadState('networkidle')
+    return reads
+  }
+
+  test('Tasks', async ({ context, page }) => {
+    await signIn(context)
+    const reads = await countReads(page, '/jobs/c-job1?tab=tasks')
+    expect(reads.fh_job_todos).toBe(1)
+  })
+
+  test('Contract balance', async ({ context, page }) => {
+    await signIn(context)
+    const reads = await countReads(page, '/jobs/c-job1?tab=financials')
+    expect({ payments: reads.fh_payments, insurance: reads.fh_insurance_claims, changeOrders: reads.fh_change_orders, invoices: reads.fh_invoices })
+      .toEqual({ payments: 1, insurance: 1, changeOrders: 1, invoices: 1 })
+  })
+
+  test('Invoices', async ({ context, page }) => {
+    await signIn(context)
+    const reads = await countReads(page, '/jobs/c-job1?tab=draws')
+    expect(reads.fh_invoices).toBe(1)
+  })
+})
+
 // Mark complete writes the closeout record and moves the job to Closed.
 // Before this test nothing submitted the screen.
 test('Mark complete saves the closeout and closes the job', async ({ context, page }) => {

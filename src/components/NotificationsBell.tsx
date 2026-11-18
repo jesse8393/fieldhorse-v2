@@ -17,16 +17,19 @@ import { hapticTap } from '../lib/haptics.ts'
 // migration is applied.
 export default function NotificationsBell() {
   const { user } = useAuth()
+  // Keyed on the id, not the user object: the same person published again
+  // must not read the count again or rebuild the realtime channel.
+  const userId = user?.id ?? null
   const navigate = useNavigate()
   const [unread, setUnread] = useState(0)
 
   const refresh = useCallback(async () => {
-    if (!user) { setUnread(0); return }
+    if (!userId) { setUnread(0); return }
     // notificationBadgeCount never throws, so the bell never does. A failed
     // read answers null and keeps the last count rather than a false 0.
-    const count = await notificationBadgeCount(user.id)
+    const count = await notificationBadgeCount(userId)
     if (count != null) setUnread(count)
-  }, [user])
+  }, [userId])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -45,17 +48,17 @@ export default function NotificationsBell() {
   }, [refresh])
 
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
     const channel = supabase
-      .channel(`fh_notifications:bell:${user.id}`)
+      .channel(`fh_notifications:bell:${userId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'fh_notifications', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'fh_notifications', filter: `user_id=eq.${userId}` },
         () => refresh()
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [user, refresh])
+  }, [userId, refresh])
 
   return (
     <button

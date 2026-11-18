@@ -185,6 +185,90 @@ test('a fully invoiced job never prefills or saves the unpaid balance again', as
   expect(invoiceWrites).toBe(0)
 })
 
+// The job type picked on the last saved job or quote starts the next New
+// job and New quote, as the old lead sheet did (vibe audit
+// settings-wiped-2). A company that pours concrete picks it once.
+test('the job type of the last saved job starts the next New job and New quote', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  await open(page, '/jobs/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel(/Job type/)).toHaveValue('')
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByLabel('Title').fill('Shed slab')
+  await page.getByLabel(/Job type/).selectOption('Concrete')
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1/, { timeout: 30_000 })
+
+  await open(page, '/quotes/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+  await page.getByLabel('Client').fill('Dana Whitfield')
+  await page.getByLabel(/Job type/).selectOption('Roofing')
+  await page.getByRole('button', { name: 'Save quote' }).click()
+  await expect(page).toHaveURL(/\/quotes\/q-quote/, { timeout: 30_000 })
+  await open(page, '/jobs/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Roofing', { timeout: 30_000 })
+})
+
+// A Save right after a change left the draft timer running. It wrote the
+// saved job back as the draft once the job screen was loading, so the next
+// New job opened refilled with the job just saved.
+test('a saved job leaves no draft behind', async ({ context, page }) => {
+  await signIn(context, { tables: JOB_FIRST })
+  await open(page, '/jobs/new')
+  await expect(page.getByRole('heading', { level: 1, name: 'New job' })).toBeVisible({ timeout: 30_000 })
+  await page.getByLabel('Client').fill('Jeff')
+  await page.getByRole('option', { name: /Jeff Roy/ }).click()
+  await page.getByLabel('Title').fill('Shed slab')
+  await page.getByLabel(/Job type/).selectOption('Concrete')
+  await page.getByRole('button', { name: 'Save job' }).click()
+  await expect(page).toHaveURL(/\/jobs\/c-job1/, { timeout: 30_000 })
+  await page.waitForTimeout(1000)
+  expect(await page.evaluate(() => localStorage.getItem('fh:draft:job'))).toBeNull()
+})
+
+// Most leads carry no job type, because New lead has no such field. Quote
+// this on one of them kept the remembered job type only when the lead
+// named none of its own.
+function lead(partial: Record<string, unknown>) {
+  return {
+    user_id: 'qa-user-1', client_id: 'cl-1', status: 'open', notes: null, last_contact: null, quote_id: null, follow_up_on: null,
+    source: 'Google', referred_by: null, origin_contact_id: null, created_at: NOW, updated_at: NOW,
+    fh_clients: { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' },
+    ...partial
+  }
+}
+const LEAD_PLAIN = lead({ id: 'l-plain', title: 'Backyard patio', job_type: null })
+const LEAD_ROOF = lead({ id: 'l-roof', title: 'Garage roof', job_type: 'Roofing' })
+
+test('Quote this on a lead with no job type keeps the remembered job type', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_leads: [LEAD_PLAIN, LEAD_ROOF] } })
+  await context.addInitScript(() => { localStorage.setItem('fh:last-job-type', 'Concrete') })
+  await open(page, '/quotes/new?lead=l-plain')
+  await expect(page.getByLabel('Title')).toHaveValue('Backyard patio', { timeout: 30_000 })
+  await expect(page.getByLabel('Client')).toHaveValue('Jeff Roy')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete')
+  // A lead that names its own job type still starts the quote with it.
+  await open(page, '/quotes/new?lead=l-roof')
+  await expect(page.getByLabel('Title')).toHaveValue('Garage roof', { timeout: 30_000 })
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Roofing')
+})
+
+test('the job type the old lead sheet remembered still starts New job', async ({ context, page }) => {
+  await signIn(context)
+  // The build before the October redesign kept it under fh:lastJobType.
+  await context.addInitScript(() => {
+    if (sessionStorage.getItem('old-job-type-seeded')) return
+    sessionStorage.setItem('old-job-type-seeded', '1')
+    localStorage.setItem('fh:lastJobType', 'Concrete')
+  })
+  await open(page, '/jobs/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+  expect(await page.evaluate(() => localStorage.getItem('fh:lastJobType'))).toBeNull()
+  await open(page, '/quotes/new')
+  await expect(page.getByLabel(/Job type/)).toHaveValue('Concrete', { timeout: 30_000 })
+})
+
 test('typing a new name on Quote creates the client', async ({ context, page }) => {
   await signIn(context)
   const clientInserts: Record<string, unknown>[] = []

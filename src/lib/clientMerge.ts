@@ -336,9 +336,7 @@ export async function mergeClients({ userId, survivor, losers }: { userId: strin
   // 2) Move everything in one transaction when the database can. It is not
   // in every database yet, so a missing function falls through to step 3.
   let databaseMerged = false
-  // The generated types do not list the function until its migration is applied.
-  const rpc = supabase.rpc.bind(supabase) as unknown as (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>
-  const { data: merged, error: mergeErr } = await rpc(MERGE_FUNCTION, { p_survivor: survivor.id, p_duplicates: loserIds })
+  const { data: merged, error: mergeErr } = await supabase.rpc(MERGE_FUNCTION, { p_survivor: survivor.id, p_duplicates: loserIds })
   if (mergeErr && !functionMissing(mergeErr)) {
     throw new Error("Couldn't move the duplicate's records. Nothing was deleted. Check your connection and try again.")
   }

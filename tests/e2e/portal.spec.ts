@@ -581,6 +581,31 @@ test('a quote without the Fieldhorse theme keeps its own look (decision D13)', a
   await expect(page.getByText('Powered by Fieldhorse')).toHaveCount(0)
 })
 
+// The classic bar's authority checkbox and approve button wore the gold the
+// brand retired. Both take the brand copper now, with white text on the
+// button so it stays readable (vibe audit purple-1).
+test('the classic approve bar wears the brand copper', async ({ page, context }) => {
+  await mockPortal(context, proposalPayload({ company: { estimate_template: 'classic' } }))
+  await page.goto('/p/t1', { waitUntil: 'domcontentloaded' })
+  const approve = page.getByRole('button', { name: 'Approve & notify contractor' })
+  await expect(approve).toBeVisible()
+  const box = page.getByRole('checkbox', { name: /I have the authority/ })
+  const gold = await page.evaluate(() => {
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--fh-gold)'
+    document.body.appendChild(probe)
+    const resolved = getComputedStyle(probe).color
+    probe.remove()
+    return resolved
+  })
+  expect(gold).toBe('rgb(173, 64, 41)')
+  expect(await box.evaluate((el) => getComputedStyle(el).accentColor)).toBe(gold)
+  const look = await approve.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, image: getComputedStyle(el).backgroundImage, color: getComputedStyle(el).color }))
+  expect(look.image).toBe('none')
+  expect(look.bg).toBe(gold)
+  expect(look.color).toBe('rgb(255, 255, 255)')
+})
+
 test('a quote with no template set keeps resolving to classic (decision D13)', async ({ page, context }) => {
   const payload = proposalPayload()
   delete (payload.company as Record<string, unknown>).estimate_template

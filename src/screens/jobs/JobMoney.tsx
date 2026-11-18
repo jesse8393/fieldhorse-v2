@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase, authHeaders } from '../../lib/supabase.ts'
 import { useInvoiceDetail, useInvalidateInvoiceDetail } from '../../lib/queries.ts'
 import { reviewInvoice } from '../../lib/invoiceReview.js'
-import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, sendInvoiceEmail } from '../../lib/invoices.ts'
+import { billTo, companyFromProfile, fetchInvoicesForContact, createInvoice, invoiceAmountDue, invoiceDescription, jobInvoicesKey, readJobInvoices, sendInvoiceEmail } from '../../lib/invoices.ts'
 import { useDocumentProfile } from '../../lib/companyBranding.ts'
 import { endSendIntent, sendIntent, sendKey, startInvoiceSend, startSend, useSendInFlight, type SendIntent } from '../../lib/invoiceSends.ts'
 import { pickBalanceInvoice } from '../../lib/invoiceSettlement.ts'
@@ -92,13 +92,19 @@ function methodLabel(m: any) {
   return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
-export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
+export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged, jobMoney }: {
   /** The job (fh_contacts id). Falls back to the route's :id. */
   id?: string
   /** Records a payment against the job when no open draw is billing it. */
   onOpenLogPayment?: () => void
   /** The job page reloads its own money after a change here. */
   onChanged?: () => void
+  /**
+   * The payments, insurance claim and change orders the job page already
+   * read, so this screen does not read them again. onChanged must then
+   * reload them.
+   */
+  jobMoney?: { payments?: any[]; insurance?: any; changeOrders?: any[] }
 } = {}) {
   const params = useParams()
   const id = idProp ?? params.id
@@ -109,21 +115,26 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   // contact (owner-only RLS, null for partner viewers); change orders
   // (migration 019) bump the contract total when approved. Both come
   // back in the bundle below.
-  const { data: bundle, isPending: loading, isError, error: queryError } = useInvoiceDetail(id, user?.id)
+  const fromJob = !!jobMoney
+  const { data: bundle, isPending: loading, isError, error: queryError } = useInvoiceDetail(id, user?.id, { withMoney: !fromJob })
   const invalidateInvoiceDetail = useInvalidateInvoiceDetail()
   const queryClient = useQueryClient()
   // Refresh BOTH caches, a payment can settle the current draw
   // (stages.ts flips it to 'paid'), and refreshing only the contact
   // left the document view billing an already-paid draw until remount.
+  // The job page's reload (onChanged) reads the job's invoices too, since
+  // they sit under its key.
   const refresh = () => {
     invalidateInvoiceDetail(id)
-    queryClient.invalidateQueries({ queryKey: ['invoiceDraws', id] })
-    onChanged?.()
+    if (onChanged) onChanged()
+    else queryClient.invalidateQueries({ queryKey: jobInvoicesKey(id) })
   }
   const contact = bundle?.contact ?? null
-  const payments = useMemo(() => bundle?.payments ?? [], [bundle])
-  const insurance = bundle?.insurance ?? null
-  const changeOrders = useMemo(() => bundle?.changeOrders ?? [], [bundle])
+  const jobPayments = jobMoney?.payments
+  const jobChangeOrders = jobMoney?.changeOrders
+  const payments = useMemo(() => (fromJob ? jobPayments : bundle?.payments) ?? [], [fromJob, jobPayments, bundle])
+  const insurance = (fromJob ? jobMoney?.insurance : bundle?.insurance) ?? null
+  const changeOrders = useMemo(() => (fromJob ? jobChangeOrders : bundle?.changeOrders) ?? [], [fromJob, jobChangeOrders, bundle])
   const error = isError ? plainError(queryError, 'Could not load the invoice. Check your connection and try again.') : ''
 
   // First-class invoice draws (fh_invoices) for this job. fh_contacts has
@@ -131,12 +142,8 @@ export default function JobMoney({ id: idProp, onOpenLogPayment, onChanged }: {
   // billing schedule all live on these rows, so the on-screen document
   // and the emailed PDF stay in sync with the public link.
   const { data: invoiceRows = [] } = useQuery({
-    queryKey: ['invoiceDraws', id],
-    queryFn: async () => {
-      const { data, error: fetchErr } = await fetchInvoicesForContact(id as string)
-      if (fetchErr) throw fetchErr
-      return data
-    },
+    queryKey: jobInvoicesKey(id),
+    queryFn: () => readJobInvoices(id as string),
     enabled: !!id
   })
 

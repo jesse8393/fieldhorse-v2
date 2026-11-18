@@ -67,7 +67,7 @@ export function money(n: unknown) {
 export function invalidateAfterPayment(queryClient: QueryClient, jobId: string | null | undefined) {
   if (jobId) {
     void queryClient.invalidateQueries({ queryKey: ['invoiceDetail', jobId] })
-    void queryClient.invalidateQueries({ queryKey: ['invoiceDraws', jobId] })
+    // Also the job's invoices (jobInvoicesKey), which sit under its key.
     void queryClient.invalidateQueries({ queryKey: ['jobDetail', jobId] })
   }
   void queryClient.invalidateQueries({ queryKey: ['invoices'] })

@@ -10,6 +10,7 @@ export default function DetailsTab({
   contact,
   inspections,
   scheduleItems,
+  todos,
   userId,
   fetchAll,
   patch,
@@ -27,7 +28,7 @@ export default function DetailsTab({
           <MilestonesSection contact={contact} patch={patch} />
         )}
         {sub === 'todos' && (
-          <TodosSection jobId={contact?.id} userId={userId} onChanged={fetchAll} />
+          <TodosSection jobId={contact?.id} userId={userId} onChanged={fetchAll} initialRows={todos} />
         )}
         {sub === 'scheduled' && (
           <ScheduledSection

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 import { signIn } from './helpers/signIn.ts'
 
 const titles = ['Give every job a home.', 'Build a day that works.', 'Keep everyone in context.', 'Put clear scope in writing.', 'Make every payment clear.']
@@ -75,6 +75,73 @@ test('unavailable guide retains written steps and switching clears its failure',
   await page.getByRole('navigation', { name: 'Quick guides' }).getByRole('button', { name: /Build a day/ }).click()
   await expect(page.getByRole('status')).toHaveCount(0)
   await expect(page.getByRole('button', { name: `Play ${titles[1]}`, exact: true })).toBeVisible()
+})
+
+// Native checkboxes take the brand copper, never the browser's stock blue
+// (vibe audit purple-1). The accent must equal --fh-gold as the page
+// resolves it, in Day and in Night.
+async function expectBrandAccent(box: Locator) {
+  const [accent, gold] = await box.evaluate((el) => {
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--fh-gold)'
+    document.body.appendChild(probe)
+    const resolved = getComputedStyle(probe).color
+    probe.remove()
+    return [getComputedStyle(el).accentColor, resolved]
+  })
+  expect(accent).not.toBe('auto')
+  expect(accent).toBe(gold)
+}
+
+const CREW = [
+  { id: 'm1', user_id: 'crew-alice', name: 'Alice Crew', role: 'crew' },
+  { id: 'm2', user_id: 'crew-riley', name: 'Riley Foreman', role: 'foreman' }
+]
+
+for (const mode of ['day', 'night'] as const) {
+  test(`the crew picker checkbox wears the brand copper in ${mode}`, async ({ context, page }) => {
+    await signIn(context, { mode, role: 'manager', tables: { fh_schedule: [] } })
+    await context.route('**/api/org-members-list', (route) => route.fulfill({ json: { ok: true, org_id: 'org-1', members: CREW, invites: [], caller_role: 'manager' } }))
+    await page.goto('/schedule/new')
+    await page.getByLabel('Title', { exact: true }).fill('Foundation pour')
+    await page.getByLabel('Date', { exact: true }).fill('2026-10-28')
+    await page.getByLabel('Time', { exact: true }).fill('08:00')
+    const box = page.getByRole('checkbox', { name: /Alice Crew/ })
+    await box.check()
+    await expectBrandAccent(box)
+  })
+}
+
+test('the import "Import them anyway" checkbox wears the brand copper', async ({ context, page }) => {
+  await signIn(context)
+  await context.route('**/rest/v1/fh_leads*', (route) => {
+    if (route.request().method() !== 'GET' || !route.request().url().includes('fh_leads_client_id_fkey')) return route.fallback()
+    return route.fulfill({ json: [{ id: 'l-lead1', title: 'Vintage Burkitt Station Drainage', fh_clients: { name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com' } }] })
+  })
+  await page.goto('/import')
+  const csv = 'Name,Phone,Email,Job title\nJeff Roy,555-0101,jeff@roy.com,Vintage Burkitt Station Drainage\nNew Person,555-0199,new@example.com,Patio\n'
+  await page.locator('input[type="file"]').setInputFiles({ name: 'leads.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) })
+  const box = page.getByRole('checkbox', { name: 'Import them anyway' })
+  await expect(box).toBeVisible({ timeout: 15_000 })
+  await box.check()
+  await expectBrandAccent(box)
+})
+
+test('the invoice billing review checkbox wears the brand copper', async ({ context, page }) => {
+  const day = 86_400_000
+  const now = Date.now()
+  const iso = (t: number) => new Date(t).toISOString()
+  const client = { id: 'cl-1', name: 'Jeff Roy', phone: '555-0101', email: 'jeff@roy.com', address: '412 Burkitt Station Rd' }
+  const base = { user_id: 'qa-user-1', org_id: 'org-1', client_id: 'cl-1', contact_id: 'c-job2', amount: 6400, status: 'draft', issued_at: null, due_at: iso(now + 6 * day), description: null, notes: null, fh_clients: client }
+  await signIn(context, { tables: { fh_invoices: [
+    { ...base, id: 'invd1', title: 'Progress draw 2', sequence_number: 3, created_at: iso(now - 2 * day) },
+    { ...base, id: 'invd2', title: 'Progress draw 2', sequence_number: 4, created_at: iso(now - day) }
+  ] } })
+  await page.goto('/invoices/invd2')
+  const box = page.getByRole('checkbox', { name: /I reviewed these records/ })
+  await expect(box).toBeVisible({ timeout: 15_000 })
+  await box.check()
+  await expectBrandAccent(box)
 })
 
 test('Today shortcuts open existing schedule and capture flows', async ({ context, page }) => {

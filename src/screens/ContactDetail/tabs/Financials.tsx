@@ -27,7 +27,12 @@ export default function FinancialsTab({
           <ExpensesSection contact={contact} expenses={expenses} userId={userId} fetchAll={fetchAll} />
         )}
         {sub === 'invoice' && (
-          <JobMoney id={contact.id} onOpenLogPayment={onOpenLogPayment} onChanged={fetchAll} />
+          <JobMoney
+            id={contact.id}
+            onOpenLogPayment={onOpenLogPayment}
+            onChanged={fetchAll}
+            jobMoney={{ payments, insurance, changeOrders }}
+          />
         )}
         {sub === 'draws' && (
           <InvoiceDrawsSection

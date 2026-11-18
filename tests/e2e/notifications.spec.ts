@@ -198,6 +198,36 @@ test('the bell counts what the screen lists', async ({ context, page }) => {
   await expect(page.getByRole('region', { name: 'Reminders' }).locator('.fhn-row')).toHaveCount(2)
 })
 
+// The app publishes the same signed in person more than once (the saved
+// session, then the auth listener's own copy), and the bell read its count
+// again for each copy, twice on every app reopen (vibe audit console-1).
+// Here the auth client hears the same session again, the way another tab's
+// token refresh reaches it, and the bell must not read again.
+test('the bell reads its count once for the same person, however often the session is published', async ({ context, page }) => {
+  await signIn(context, { tables: { fh_notifications: [APPROVED] } })
+  const reads: string[] = []
+  page.on('request', (request) => {
+    const url = request.url()
+    if (url.includes('/rest/v1/rpc/fh_my_open_reminders') || (url.includes('/rest/v1/fh_notifications') && url.includes('read_at=is.null'))) reads.push(`${request.method()} ${url}`)
+  })
+  await open(page, '/work', '.fhs-header')
+  await expect(page.getByRole('button', { name: 'Notifications, 1 unread', exact: true })).toBeVisible()
+  await page.waitForTimeout(1000)
+  const settled = reads.length
+  expect(settled).toBeGreaterThan(0)
+  await page.evaluate(() => {
+    const key = 'sb-qa-mock-auth-token'
+    const session = JSON.parse(localStorage.getItem(key) || 'null')
+    const channel = new BroadcastChannel(key)
+    channel.postMessage({ event: 'TOKEN_REFRESHED', session })
+    channel.postMessage({ event: 'SIGNED_IN', session: { ...session, user: { ...session.user } } })
+    channel.close()
+  })
+  await page.waitForTimeout(1500)
+  await expect(page.getByRole('button', { name: 'Notifications, 1 unread', exact: true })).toBeVisible()
+  expect(reads.slice(settled)).toEqual([])
+})
+
 test('a reminder row offers Text, Done closes every reminder for that client and the row leaves', async ({ context, page }) => {
   const reminders = [open1('Jeff Roy', 'day3', 4), open1('Jeff Roy', 'day7', 1, { headline: 'Day 7 call: Jeff Roy' }), open1('Ana Ortiz', 'day3', 2)]
   await signIn(context, { tables: { fh_notifications: reminders.map(asNote) } })

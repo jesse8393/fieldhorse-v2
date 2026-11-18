@@ -5747,6 +5747,7 @@ export type Database = {
         Args: { p_client_id: string }
         Returns: undefined
       }
+      fh_company_branding: { Args: { p_org_id: string }; Returns: Json }
       fh_consent_set: {
         Args: {
           p_channel: string
@@ -6105,6 +6106,10 @@ export type Database = {
           p_sms_consent?: boolean
           p_via: string
         }
+        Returns: Json
+      }
+      fh_merge_client_into: {
+        Args: { p_duplicates: string[]; p_survivor: string }
         Returns: Json
       }
       fh_message_hold: {

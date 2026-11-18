@@ -86,6 +86,9 @@ test.describe('duplicates are reviewed on a screen', () => {
         fh_invoices: [{ id: 'inv-dup', user_id: USER.id, client_id: 'cl-dup', contact_id: null, amount: 500, status: 'sent', created_at: iso(NOW - DAY) }]
       }
     })
+    // The mock's database merge would move them in one call, so this
+    // company has not installed it yet and the app moves them itself.
+    await context.route('**/rest/v1/rpc/fh_merge_client_into', (route) => route.fulfill({ status: 404, json: { code: 'PGRST202', message: 'Could not find the function public.fh_merge_client_into(p_duplicates, p_survivor) in the schema cache' } }))
     const writes = watchWrites(page)
     await open(page, '/clients/merge')
     await expect(page.getByText('Leads, quotes, jobs, invoices and notes move to the kept client.', { exact: false })).toBeVisible()
@@ -98,6 +101,34 @@ test.describe('duplicates are reviewed on a screen', () => {
       expect(writes.some((w) => w.startsWith(`PATCH ${table}`)), table).toBe(true)
     }
     expect(writes.some((w) => w.startsWith('DELETE fh_clients'))).toBe(false)
+  })
+
+  // With the database merge installed, one call moves the duplicate's
+  // leads, quotes and invoices, the check finds nothing left on it, and it
+  // is deleted. The app's own moves still run after it and find nothing.
+  test('merging uses the database merge when the company has it', async ({ context, page }) => {
+    await signIn(context, {
+      tables: {
+        fh_clients: [JEFF, JEFF_AGAIN],
+        fh_leads: [{ id: 'lead-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Back patio', status: 'open', created_at: iso(NOW - DAY) }],
+        fh_quotes: [{ id: 'q-dup', user_id: USER.id, client_id: 'cl-dup', title: 'Driveway', status: 'approved', amount: 12000, created_at: iso(NOW - DAY) }],
+        fh_invoices: [{ id: 'inv-dup', user_id: USER.id, client_id: 'cl-dup', contact_id: null, amount: 500, status: 'sent', created_at: iso(NOW - DAY) }]
+      }
+    })
+    const merges: Record<string, unknown>[] = []
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && req.url().includes('/rest/v1/rpc/fh_merge_client_into')) merges.push(req.postDataJSON())
+    })
+    const writes = watchWrites(page)
+    await open(page, '/clients/merge')
+    await page.getByRole('button', { name: 'Merge cluster' }).click()
+    await page.waitForTimeout(600) // a second tap within 500 ms is ignored (OPS-02)
+    await page.getByRole('button', { name: 'Tap again to merge' }).click()
+
+    await expect(page.getByText('All clean.')).toBeVisible()
+    expect(merges).toEqual([{ p_survivor: 'cl-1', p_duplicates: ['cl-dup'] }])
+    expect(writes.filter((w) => w.startsWith('DELETE fh_clients'))).toHaveLength(1)
+    await expect(page.getByText(/could not be moved/)).toHaveCount(0)
   })
 
   test('a failed clients read says so instead of "All clean" (S23)', async ({ context, page }) => {
